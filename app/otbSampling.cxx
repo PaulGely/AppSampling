@@ -72,9 +72,7 @@ private:
     SetDefaultParameterInt("nd", 0);
     MandatoryOff("nd");
     
-    AddParameter(ParameterType_Int, "fc", "Field of class");
-    SetDefaultParameterInt("fc", 1);
-    MandatoryOff("fc");
+    AddParameter(ParameterType_String, "cfield", "Field of class");
   }
 
   void DoUpdateParameters()
@@ -104,7 +102,6 @@ private:
     layer = ogrDS->CreateLayer(layername, &oSRS, wkbPoint, options);
     
     int noDataValue = GetParameterInt("nd");
-    int fieldOfClass = GetParameterInt("fc");
     
     unsigned int nbComp = image->GetNumberOfComponentsPerPixel();
     
@@ -119,7 +116,7 @@ private:
       layer.CreateField(field, true);
     }  
     
-    for(unsigned int comp = 0; comp < preFeature.ogr().GetFieldCount(); ++comp)
+    for(int comp = 0; comp < preFeature.ogr().GetFieldCount(); ++comp)
     {  
       std::ostringstream fieldoss;
       fieldoss<<comp + nbComp;
@@ -136,18 +133,16 @@ private:
 
     //std::cout << "Number of tiles: " << nbTilesX <<" x "<< nbTilesY << std::endl;    
     
-    unsigned long regionCount = 0;
+    //unsigned long regionCount = 0;
     int test = 0;
     int nbOfPixelsInImage = sizeImageX * sizeImageY;    
         
     std::map<int, int> elmtOfClass;
     std::map<int, int> poly;
     
-    int nbClasses = 0;
     int nbPoly = 0;
     
     std::cout << " -*-*-*-   1ère Passe   -*-*-*- " << std::endl;
-    std::cout << " -*-*-*-   BONJOUR !   -*-*-*- " << std::endl;
     
     // *** *** 1ère passe : PROSPECTION      *** ***    
     for(unsigned int row = 0; row < nbTilesY; ++row)
@@ -169,7 +164,7 @@ private:
                 
         std::cout << "* Tiles nb : " << (row)*(nbTilesY)+(column+1) << std::endl;    
 
-        int flag = 0;
+        //int flag = 0;
 
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
@@ -210,7 +205,7 @@ private:
                   
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
                       
-            flag = 1;
+            //flag = 1;
             //myfile << "------ Tiles nb : " << (row)*(nbTilesY)+(column+1) << "------" << std::endl;
             
             int nbOfPixels = 0;
@@ -227,7 +222,7 @@ private:
               pointOGR.setY(point[1]);
                             
               bool noDataTest = false;            
-              for (int i=0; i<nbComp; i++)
+              for (unsigned int i=0; i<nbComp; i++)
               {   
                 if(noDataTest && (pixelValue[i] == noDataValue))
                 {
@@ -243,8 +238,8 @@ private:
               //myfile << msg << std::endl;           
             }            
             
-            bool testPressence = false;
-            int nomClass = featIt->ogr().GetFieldAsInteger(1);             
+            //bool testPressence = false;
+            int nomClass = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
             std::cout<< " Nb of Pixels in " << nomClass << " is : " << nbOfPixels << std::endl;
             
             poly[nbPoly] = nbOfPixels;
@@ -295,7 +290,7 @@ private:
         std::cout << "* Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
         //std::cout << "* X : " << row << "  Y : " << column << std::endl;
 
-        int flag = 0;
+        //int flag = 0;
 
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
@@ -336,7 +331,7 @@ private:
             //std::cout<<featIt->ogr().GetFieldAsInteger("class")<<std::endl;       
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
                       
-            flag = 1;
+            //flag = 1;
             //myfile << "------ Tiles nb : " << (row)*(nbTilesY)+(column+1) << "------" << std::endl;
                           
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
@@ -352,7 +347,7 @@ private:
               //std::cout<<pointOGR.getX()<<std::endl;
                              
               bool noDataTest = false;            
-              for (int i=0; i<nbComp; i++)
+              for (unsigned int i=0; i<nbComp; i++)
               {   
                 if(noDataTest && (pixelValue[i] == noDataValue))
                 {
@@ -368,14 +363,20 @@ private:
                 
                 dstFeature.SetGeometry(&pointOGR);     
                           
-                for (int i=0; i<nbComp; i++)
+                for (unsigned int i=0; i<nbComp; i++)
                 {
                   msg += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
                   dstFeature.ogr().SetField(i, pixelValue[i]);    
                 }
-                 
-                dstFeature.ogr().SetField(nbComp, featIt->ogr().GetFieldAsString(fieldOfClass));
-                                
+                
+                for(int c = 0; c < preFeature.ogr().GetFieldCount(); ++c)
+                {  
+                  if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTString )
+                  {
+                    dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsString(c));
+                  }    
+                }  
+                
                 //msg += " " + to_string(point[0]) + " " + to_string(point[1]);
                 layer.CreateFeature(dstFeature);
                 myfile << msg << std::endl;           
