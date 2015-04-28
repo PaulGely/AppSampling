@@ -128,7 +128,7 @@ private:
     for(unsigned int comp = 0; comp<nbComp; ++comp)
     {  
       std::ostringstream fieldoss;
-      fieldoss<<comp;
+      fieldoss<<"b"<<comp;
       OGRFieldDefn field(fieldoss.str().c_str(), OFTReal);
       layer.CreateField(field, true);
     }  
@@ -137,12 +137,12 @@ private:
     {  
       std::ostringstream fieldoss;
       fieldoss<<comp + nbComp;
-      OGRFieldDefn field(fieldoss.str().c_str(), preFeature.ogr().GetFieldDefnRef(comp)->GetType());
+      OGRFieldDefn field(preFeature.ogr().GetFieldDefnRef(comp)->GetNameRef(), preFeature.ogr().GetFieldDefnRef(comp)->GetType());
       layer.CreateField(field, true);  
     }  
             
-    unsigned long sizeTilesX = 200;
-    unsigned long sizeTilesY = 200;
+    unsigned long sizeTilesX = 500;
+    unsigned long sizeTilesY = 500;
     unsigned long sizeImageX = image->GetLargestPossibleRegion().GetSize()[0];
     unsigned long sizeImageY = image->GetLargestPossibleRegion().GetSize()[1];    
     unsigned int nbTilesX    = sizeImageX/sizeTilesX + (sizeImageX%sizeTilesX > 0 ? 1 : 0);
@@ -292,6 +292,10 @@ private:
     
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
+    typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
+    GeneratorType::Pointer generator = GeneratorType::New();
+    generator->Initialize();
+    
     // *** *** 2ème passe : ECHANTILLONAGE   *** ***
     for(unsigned int row = 0; row < nbTilesY; ++row)
     {
@@ -339,7 +343,7 @@ private:
         otb::ogr::Layer filtered = vectorData->GetLayer(0);
         filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
   
-        std::cout<<"Feature count: "<<filtered.GetFeatureCount(true)<<std::endl;
+        //std::cout<<"Feature count: "<<filtered.GetFeatureCount(true)<<std::endl;
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
         
         for(; featIt!=filtered.end(); ++featIt)
@@ -360,8 +364,7 @@ private:
             //flag = 1;
             //myfile << "------ Tiles nb : " << (row)*(nbTilesY)+(column+1) << "------" << std::endl;
             
-            typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
-            GeneratorType::Pointer generator = GeneratorType::New();
+            
             
             int pixC = 0;
             
@@ -387,16 +390,16 @@ private:
               }
               
               
-              generator->Initialize();
+              
                 
               //std::cout<< "Current polygone : " <<  polyCount << " has : " << poly[polyCount] << " pixels." << std::endl;
               //std::cout << generator->GetUniformVariate(0, 1) << std::endl;
               
               bool rdmTest = false;
-              //float toto = float(200)/float(nbPixelCount);
-              float toto = (float(200)/float(nbPixelCount))/(float(elmtOfClass[nomClass])/(float(nbPixelCount)/4));
-              //std::cout<<"affichage : "<< toto << std::endl;
-              if(generator->GetUniformVariate(0, 1) < toto)
+              //float proba = float(200)/float(nbPixelCount);
+              float proba = (float(2000))/(float(elmtOfClass[nomClass])*elmtOfClass.size());
+              //std::cout<<"affichage : "<< proba << std::endl;
+              if(generator->GetUniformVariate(0, 1) < proba)
               {
                 rdmTest= true;                
                 //std::cout<< "Test RDM : " << rdmTest << std::endl;
@@ -435,8 +438,8 @@ private:
               }         
             }
             
-            std::cout<<"Pix count elmt : "<<elmtOfClass[nomClass]<< std::endl;
-            std::cout<<"Pix  : "<<pixC<< std::endl;
+            //std::cout<<"Pix count elmt : "<<elmtOfClass[nomClass]<< std::endl;
+            //std::cout<<"Pix  : "<<pixC<< std::endl;
             
             polyCount++;
           }   
