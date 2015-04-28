@@ -152,6 +152,7 @@ private:
     
     //unsigned long regionCount = 0;
     int test = 0;
+    int nbPixelCount = 0;
     int nbOfPixelsInImage = sizeImageX * sizeImageY;    
         
     std::map<int, int> elmtOfClass;
@@ -179,7 +180,7 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
                 
-        std::cout << "* Tiles nb : " << (row)*(nbTilesY)+(column+1) << std::endl;    
+        std::cout << "** 1 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << " over " << nbTilesY*nbTilesX << std::endl;    
 
         //int flag = 0;
 
@@ -250,6 +251,7 @@ private:
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {
                 nbOfPixels++;
+                nbPixelCount++;
               }     
                             
               //myfile << msg << std::endl;           
@@ -257,7 +259,7 @@ private:
             
             //bool testPressence = false;
             int nomClass = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-            std::cout<< " Nb of Pixels in " << nomClass << " is : " << nbOfPixels << std::endl;
+            //std::cout<< " Nb of Pixels in " << nomClass << " is : " << nbOfPixels << std::endl;
             
             poly[nbPoly] = nbOfPixels;
             elmtOfClass[nomClass] = elmtOfClass[nomClass] + nbOfPixels;
@@ -272,6 +274,8 @@ private:
     
     std::cout<< "Nb de classes : " << elmtOfClass.size() << std::endl;
     
+    std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
+    
     for(std::map<int, int>::iterator iClass = elmtOfClass.begin(); iClass != elmtOfClass.end(); ++iClass)
     {
       std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
@@ -279,11 +283,13 @@ private:
     
     std::cout<< "Nb de polygones : " << poly.size() << std::endl;
 
-    for(std::map<int, int>::iterator iPoly = poly.begin(); iPoly != poly.end(); ++iPoly)
+    /*for(std::map<int, int>::iterator iPoly = poly.begin(); iPoly != poly.end(); ++iPoly)
     {
       std::cout << "Dans le poly " << (*iPoly).first << " il y a " << (*iPoly).second << " pixels." << std::endl;
-    } 
-         
+    } */
+       
+    int polyCount = 0;    
+    
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
     // *** *** 2ème passe : ECHANTILLONAGE   *** ***
@@ -304,7 +310,7 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
                 
-        std::cout << "* Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
+        std::cout << "** 2 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
         //std::cout << "* X : " << row << "  Y : " << column << std::endl;
 
         //int flag = 0;
@@ -341,6 +347,9 @@ private:
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
           //std::cout << "*" << geom->getGeometryName () << std::endl;
           
+          int nomClass = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
+          
+          
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
@@ -350,7 +359,12 @@ private:
                       
             //flag = 1;
             //myfile << "------ Tiles nb : " << (row)*(nbTilesY)+(column+1) << "------" << std::endl;
-                          
+            
+            typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
+            GeneratorType::Pointer generator = GeneratorType::New();
+            
+            int pixC = 0;
+            
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
               itk::Point<double, 2> point;
@@ -371,8 +385,24 @@ private:
                   noDataTest = true; 
                 }  
               }
-                                          
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
+              
+              
+              generator->Initialize();
+                
+              //std::cout<< "Current polygone : " <<  polyCount << " has : " << poly[polyCount] << " pixels." << std::endl;
+              //std::cout << generator->GetUniformVariate(0, 1) << std::endl;
+              
+              bool rdmTest = false;
+              //float toto = float(200)/float(nbPixelCount);
+              float toto = (float(200)/float(nbPixelCount))/(float(elmtOfClass[nomClass])/(float(nbPixelCount)/4));
+              //std::cout<<"affichage : "<< toto << std::endl;
+              if(generator->GetUniformVariate(0, 1) < toto)
+              {
+                rdmTest= true;                
+                //std::cout<< "Test RDM : " << rdmTest << std::endl;
+              }     
+                                                                  
+              if(rdmTest && !noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {               
                 test++;
                 std::string msg = to_string(featIt->ogr().GetFieldAsInteger("class"));
@@ -400,9 +430,15 @@ private:
                 
                 //msg += " " + to_string(point[0]) + " " + to_string(point[1]);
                 layer.CreateFeature(dstFeature);
-                myfile << msg << std::endl;           
+                myfile << msg << std::endl;  
+                pixC++;
               }         
             }
+            
+            std::cout<<"Pix count elmt : "<<elmtOfClass[nomClass]<< std::endl;
+            std::cout<<"Pix  : "<<pixC<< std::endl;
+            
+            polyCount++;
           }   
         }
 
@@ -410,7 +446,7 @@ private:
       }
     }  
     
-    //std::cout << "Nb test " << test << std::endl;
+    std::cout << "Nb test " << test << std::endl;
     myfile.close();
   }
 };
