@@ -156,9 +156,8 @@ private:
     int nbOfPixelsInImage = sizeImageX * sizeImageY;    
         
     std::map<int, int> elmtOfClass;
-    std::map<int, int> poly;
+    std::map<unsigned long, int> poly;
     
-    int nbPoly = 0;
     
     std::cout << " -*-*-*-   1ère Passe   -*-*-*- " << std::endl;
     
@@ -180,7 +179,7 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
                 
-        std::cout << "** 1 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << " over " << nbTilesY*nbTilesX << std::endl;    
+        //std::cout << "** 1 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << " over " << nbTilesY*nbTilesX << std::endl;    
 
         //int flag = 0;
 
@@ -261,10 +260,9 @@ private:
             int nomClass = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
             //std::cout<< " Nb of Pixels in " << nomClass << " is : " << nbOfPixels << std::endl;
             
-            poly[nbPoly] = nbOfPixels;
+            poly[featIt->ogr().GetFID()] += nbOfPixels;
             elmtOfClass[nomClass] = elmtOfClass[nomClass] + nbOfPixels;
             
-            nbPoly++;
                         
           }        
         }
@@ -272,29 +270,34 @@ private:
         //std::cout << "*** Flag = " << flag << std::endl;
     }
     
-    std::cout<< "Nb de classes : " << elmtOfClass.size() << std::endl;
+    //std::cout<< "Nb de classes : " << elmtOfClass.size() << std::endl;
     
-    std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
-    
+    //std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
+    /*
     for(std::map<int, int>::iterator iClass = elmtOfClass.begin(); iClass != elmtOfClass.end(); ++iClass)
     {
       std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
     }
     
-    std::cout<< "Nb de polygones : " << poly.size() << std::endl;
+    //std::cout<< "Nb de polygones : " << poly.size() << std::endl;
 
-    /*for(std::map<int, int>::iterator iPoly = poly.begin(); iPoly != poly.end(); ++iPoly)
+    for(std::map<unsigned long, int>::iterator iPoly = poly.begin(); iPoly != poly.end(); ++iPoly)
     {
-      std::cout << "Dans le poly " << (*iPoly).first << " il y a " << (*iPoly).second << " pixels." << std::endl;
-    } */
-       
-    int polyCount = 0;    
+      //std::cout << "Dans le poly " << (*iPoly).first << " il y a " << (*iPoly).second << " pixels." << std::endl;
+    } 
+       */
     
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
+             
+    int counterLeves[elmtOfClass.size()+1];
+    for(int b=0; b < elmtOfClass.size()+1; b++)
+    {
+      counterLeves[b]=0;
+    }
     
     // *** *** 2ème passe : ECHANTILLONAGE   *** ***
     for(unsigned int row = 0; row < nbTilesY; ++row)
@@ -314,7 +317,7 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
                 
-        std::cout << "** 2 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
+        //std::cout << "** 2 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
         //std::cout << "* X : " << row << "  Y : " << column << std::endl;
 
         //int flag = 0;
@@ -352,10 +355,10 @@ private:
           //std::cout << "*" << geom->getGeometryName () << std::endl;
           
           int nomClass = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-          
-          
+               
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
+            
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();
             //std::cout<<featIt->ogr().GetFieldAsInteger("class")<<std::endl;       
@@ -364,10 +367,23 @@ private:
             //flag = 1;
             //myfile << "------ Tiles nb : " << (row)*(nbTilesY)+(column+1) << "------" << std::endl;
             
-            
-            
             int pixC = 0;
             
+            int counter=0;
+            
+            int nbSamples = 2000;
+            
+            int nombreDePixelsDansCePoly = int ((nbSamples)*(poly[featIt->ogr().GetFID()])/(elmtOfClass[nomClass]));            
+            if(nombreDePixelsDansCePoly < 1)
+            {
+              nombreDePixelsDansCePoly = 1;
+            }
+            
+            int N = int(poly[featIt->ogr().GetFID()]/nombreDePixelsDansCePoly);       
+                        
+            //std::cout<< "Test nombreDePixelsDansCePoly : " << nombreDePixelsDansCePoly << std::endl;
+            //std::cout<< "Test MODULO : " << N << std::endl;
+            //std::cout<< "Current polygone : " <<  featIt->ogr().GetFID() << " has : " << poly[featIt->ogr().GetFID()] << " pixels." << std::endl;
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
               itk::Point<double, 2> point;
@@ -383,65 +399,89 @@ private:
               bool noDataTest = false;            
               for (unsigned int i=0; i<nbComp; i++)
               {   
-                if(noDataTest && (pixelValue[i] == noDataValue))
+                if(pixelValue[i] == noDataValue)
                 {
                   noDataTest = true; 
                 }  
               }
-              
-              
-              
-                
-              //std::cout<< "Current polygone : " <<  polyCount << " has : " << poly[polyCount] << " pixels." << std::endl;
+                           
               //std::cout << generator->GetUniformVariate(0, 1) << std::endl;
               
-              bool rdmTest = false;
+              bool resultTest = false;
+              
+              /* Random mode */
               //float proba = float(200)/float(nbPixelCount);
-              float proba = (float(2000))/(float(elmtOfClass[nomClass])*elmtOfClass.size());
-              //std::cout<<"affichage : "<< proba << std::endl;
+              /* Random mode, equally distributed according to the classes. */
+              //float proba = (float(2000))/(float(elmtOfClass[nomClass])/**elmtOfClass.size()*/);
+              /*
               if(generator->GetUniformVariate(0, 1) < proba)
               {
-                rdmTest= true;                
+                resultTest= true;                
                 //std::cout<< "Test RDM : " << rdmTest << std::endl;
-              }     
-                                                                  
-              if(rdmTest && !noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
-              {               
-                test++;
-                std::string msg = to_string(featIt->ogr().GetFieldAsInteger("class"));
-                otb::ogr::Feature dstFeature(layer.GetLayerDefn());       
-                
-                dstFeature.SetGeometry(&pointOGR);     
-                          
-                for (unsigned int i=0; i<nbComp; i++)
+              }    
+              */
+              
+              if(poly[featIt->ogr().GetFID()]!=0)
+              {
+                if((counter == poly[featIt->ogr().GetFID()]/2)&&(nombreDePixelsDansCePoly == 1))
                 {
-                  msg += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
-                  dstFeature.ogr().SetField(i, pixelValue[i]);    
+                  resultTest= true;
+                }              
+                else if((counter%N)==0 && (nombreDePixelsDansCePoly != 1))
+                {
+                  resultTest= true;                  
+                }
+              }            
+              
+              //std::cout<< "COUNTER : " << counter << std::endl;
+              //std::cout<< "MODULO : " << N << std::endl;
+              //std::cout<< "Test RESTE DE MODULO : " << counter%N << std::endl;
+              //std::cout<< "Test RDM : " << resultTest << std::endl;             
+              
+              if(/*resultTest &&*/ !noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
+              {  
+                if(resultTest)
+                {
+                  test++;
+                  std::string msg = to_string(nomClass);
+                  otb::ogr::Feature dstFeature(layer.GetLayerDefn());       
+                  
+                  dstFeature.SetGeometry(&pointOGR);     
+                            
+                  for (unsigned int i=0; i<nbComp; i++)
+                  {
+                    msg += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
+                    dstFeature.ogr().SetField(i, pixelValue[i]);    
+                  }
+                  
+                  for(int c = 0; c < preFeature.ogr().GetFieldCount(); ++c)
+                  {  
+                    if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTString )
+                    {
+                      dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsString(c));
+                    }  
+                    else if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTInteger )
+                    {
+                      dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsInteger(c));
+                    }
+                  }  
+                  
+                  //msg += " " + to_string(point[0]) + " " + to_string(point[1]);
+                  layer.CreateFeature(dstFeature);
+                  myfile << msg << std::endl;  
+                  pixC++;
+                  counterLeves[nomClass]++;
                 }
                 
-                for(int c = 0; c < preFeature.ogr().GetFieldCount(); ++c)
-                {  
-                  if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTString )
-                  {
-                    dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsString(c));
-                  }  
-                  else if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTInteger )
-                  {
-                    dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsInteger(c));
-                  }
-                }  
+                counter++;
                 
-                //msg += " " + to_string(point[0]) + " " + to_string(point[1]);
-                layer.CreateFeature(dstFeature);
-                myfile << msg << std::endl;  
-                pixC++;
-              }         
-            }
+              }  
+              
+            }                        
             
             //std::cout<<"Pix count elmt : "<<elmtOfClass[nomClass]<< std::endl;
             //std::cout<<"Pix  : "<<pixC<< std::endl;
             
-            polyCount++;
           }   
         }
 
@@ -451,6 +491,14 @@ private:
     
     std::cout << "Nb test " << test << std::endl;
     myfile.close();
+    
+    
+    for(int b=0; b < elmtOfClass.size()+1; b++)
+    {
+      std::cout<< "Counter Pix leves: "<< counterLeves[b]<< std::endl;
+    }
+    
+    
   }
 };
 }
