@@ -158,7 +158,6 @@ private:
     std::map<int, int> elmtOfClass;
     std::map<unsigned long, int> poly;
     
-    
     std::cout << " -*-*-*-   1ère Passe   -*-*-*- " << std::endl;
     
     // *** *** 1ère passe : PROSPECTION      *** ***    
@@ -262,30 +261,31 @@ private:
             
             poly[featIt->ogr().GetFID()] += nbOfPixels;
             elmtOfClass[nomClass] = elmtOfClass[nomClass] + nbOfPixels;
-            
-                        
+                     
           }        
         }
       }     
         //std::cout << "*** Flag = " << flag << std::endl;
     }
     
-    //std::cout<< "Nb de classes : " << elmtOfClass.size() << std::endl;
-    
-    //std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
+    /* TRACES */
     /*
+    std::cout<< "Nb de classes : " << elmtOfClass.size() << std::endl;
+    
+    std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
+    
     for(std::map<int, int>::iterator iClass = elmtOfClass.begin(); iClass != elmtOfClass.end(); ++iClass)
     {
       std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
     }
     
-    //std::cout<< "Nb de polygones : " << poly.size() << std::endl;
+    std::cout<< "Nb de polygones : " << poly.size() << std::endl;
 
     for(std::map<unsigned long, int>::iterator iPoly = poly.begin(); iPoly != poly.end(); ++iPoly)
     {
-      //std::cout << "Dans le poly " << (*iPoly).first << " il y a " << (*iPoly).second << " pixels." << std::endl;
+      std::cout << "Dans le poly " << (*iPoly).first << " il y a " << (*iPoly).second << " pixels." << std::endl;
     } 
-       */
+    */
     
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
@@ -371,6 +371,7 @@ private:
             
             int counter=0;
             
+            
             int nbSamples = 2000;
             
             int nombreDePixelsDansCePoly = int ((nbSamples)*(poly[featIt->ogr().GetFID()])/(elmtOfClass[nomClass]));            
@@ -380,7 +381,9 @@ private:
             }
             
             int N = int(poly[featIt->ogr().GetFID()]/nombreDePixelsDansCePoly);       
-                        
+            
+            int counterPlus=N;
+            int next=N;
             //std::cout<< "Test nombreDePixelsDansCePoly : " << nombreDePixelsDansCePoly << std::endl;
             //std::cout<< "Test MODULO : " << N << std::endl;
             //std::cout<< "Current polygone : " <<  featIt->ogr().GetFID() << " has : " << poly[featIt->ogr().GetFID()] << " pixels." << std::endl;
@@ -419,7 +422,43 @@ private:
                 resultTest= true;                
                 //std::cout<< "Test RDM : " << rdmTest << std::endl;
               }    
-              */
+              */             
+              /* TESTS POUR ALEATOIRE*/
+              /*
+              if(poly[featIt->ogr().GetFID()]!=0)
+              {
+                if((counter == poly[featIt->ogr().GetFID()]/2) && (nombreDePixelsDansCePoly == 1))
+                {
+                  resultTest= true;
+                }              
+                else if(nombreDePixelsDansCePoly != 1)
+                {
+                  if(counter== int(generator->GetUniformVariate(0, (N/2))))
+                  {
+                    resultTest= true;  
+                  }
+                  else if(counter == next)
+                  {
+                    resultTest= true; 
+                    
+                    int sign = generator->GetUniformVariate(0, 1);
+                    int rdm = int(generator->GetUniformVariate(0, (N/2)));
+                    
+                    if(counterPlus%N == 0)
+                    {
+                      if (sign<0.5)
+                      {
+                        next = counterPlus - rdm;
+                      }
+                      else
+                      {
+                        next = counterPlus + rdm;
+                      }
+                    }
+                  }
+                                  
+                }
+              }*/
               
               if(poly[featIt->ogr().GetFID()]!=0)
               {
@@ -431,14 +470,14 @@ private:
                 {
                   resultTest= true;                  
                 }
-              }            
+              } 
               
               //std::cout<< "COUNTER : " << counter << std::endl;
               //std::cout<< "MODULO : " << N << std::endl;
               //std::cout<< "Test RESTE DE MODULO : " << counter%N << std::endl;
               //std::cout<< "Test RDM : " << resultTest << std::endl;             
               
-              if(/*resultTest &&*/ !noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {  
                 if(resultTest)
                 {
@@ -471,33 +510,24 @@ private:
                   myfile << msg << std::endl;  
                   pixC++;
                   counterLeves[nomClass]++;
-                }
-                
-                counter++;
-                
-              }  
-              
-            }                        
-            
+                }                
+                counter++;    
+                counterPlus++;
+              }                
+            }  
             //std::cout<<"Pix count elmt : "<<elmtOfClass[nomClass]<< std::endl;
             //std::cout<<"Pix  : "<<pixC<< std::endl;
-            
           }   
         }
-
         //std::cout << "*** Flag = " << flag << std::endl;
       }
-    }  
-    
+    }      
     std::cout << "Nb test " << test << std::endl;
     myfile.close();
-    
-    
-    for(int b=0; b < elmtOfClass.size()+1; b++)
+    for(int b=1; b < elmtOfClass.size()+1; b++)
     {
       std::cout<< "Counter Pix leves: "<< counterLeves[b]<< std::endl;
     }
-    
     
   }
 };
