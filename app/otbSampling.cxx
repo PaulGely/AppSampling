@@ -34,6 +34,7 @@
 #include "vcl_algorithm.h"
 #include "otbMultiToMonoChannelExtractROI.h"
 #include <sstream>
+#include <iterator>     // std::advance
 
 namespace otb
 {
@@ -220,7 +221,7 @@ private:
               extractROIFilter->GetOutput()->TransformIndexToPhysicalPoint(it.GetIndex(), point);           
               
               ImageType::PixelType pixelValue = it.Get();
-              
+                            
               OGRPoint pointOGR;
               pointOGR.setX(point[0]);
               pointOGR.setY(point[1]);
@@ -330,6 +331,8 @@ private:
         //std::cout<<"Feature count: "<<filtered.GetFeatureCount(true)<<std::endl;
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
         
+        
+        
         for(; featIt!=filtered.end(); ++featIt)
         {                     
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
@@ -343,8 +346,7 @@ private:
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();       
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
              
-            int pixC = 0;
-            
+            int pixC = 0;            
             int counter=0;
             
             int nbSamples = 2000;
@@ -356,45 +358,19 @@ private:
             }
             
             int N = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);       
-                        
+            int onlyPixelInPoly = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
+            
+            int counterPlus=N;
+            int next=N;
+            
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
               itk::Point<double, 2> point;
-              IteratorType itBis = it;
                             
               bool resultTest = false;
-              
-              if(polygon[featIt->ogr().GetFID()]!=0)
-              {
-                if((counter == polygon[featIt->ogr().GetFID()]/2) && (nbPixelsInPolygon == 1))
-                {
-                  resultTest= true;
-                }              
-                else if((counter%N)==0 && (nbPixelsInPolygon != 1))
-                {
-                  resultTest= true; 
-                  //int(generator->GetUniformVariate(0, (N/2)))
-                  int sign = generator->GetUniformVariate(0, 1);
-                  if (sign<0.5)
-                  {
-                    for(int i=0; i<1; i++)
-                    {
-                      --itBis;
-                    }
-                  }
-                  else
-                  {
-                    for(int i=0; i<1; i++)
-                    {
-                      ++itBis;
-                    }
-                  }
-                  
-                }
-              }
-              
-              extractROIFilter->GetOutput()->TransformIndexToPhysicalPoint(itBis.GetIndex(), point); 
-              ImageType::PixelType pixelValue = itBis.Get();
+                                         
+              extractROIFilter->GetOutput()->TransformIndexToPhysicalPoint(it.GetIndex(), point); 
+              ImageType::PixelType pixelValue = it.Get();
                       
               OGRPoint pointOGR;
               pointOGR.setX(point[0]);
@@ -420,6 +396,56 @@ private:
                 //std::cout<< "Test RDM : " << rdmTest << std::endl;
               }    
               */   
+              
+              /* TESTS POUR ALEATOIRE*/              
+              if(polygon[featIt->ogr().GetFID()]!=0)
+              {
+                if((counter == polygon[featIt->ogr().GetFID()]/2) && (nbPixelsInPolygon == 1))
+                {
+                  resultTest= true;
+                }              
+                else if(nbPixelsInPolygon != 1)
+                {
+                  if(counter== int(generator->GetUniformVariate(0, (N/2))))
+                  {
+                    resultTest= true;  
+                  }
+                  
+                  if(counter == next)
+                  {
+                    resultTest= true; 
+                  }
+                  
+                  if(counterPlus%N == 0)
+                  {
+                    int sign = generator->GetUniformVariate(0, 1);
+                    int rdm = int(generator->GetUniformVariate(0, (N/2)));   
+                    
+                    if (sign<0.5)
+                    {
+                      next = counterPlus - rdm;
+                    }
+                    else
+                    {
+                      next = counterPlus + rdm;
+                    }
+                  }                                  
+                }
+              }
+              /*
+              if(poly[featIt->ogr().GetFID()]!=0)
+              {
+                if((counter == poly[featIt->ogr().GetFID()]/2)&&(nombreDePixelsDansCePoly == 1))
+                {
+                  resultTest= true;
+                }              
+                else if((counter%N)==0 && (nombreDePixelsDansCePoly != 1))
+                {
+                  resultTest= true;                  
+                }
+              }
+              */
+              
               
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {   
@@ -455,7 +481,8 @@ private:
                   pixC++;
                   counterLeves[className]++;
                 }                
-                counter++;    
+                counter++; 
+                counterPlus++;
               }                
             }  
             //std::cout<<"Pix count elmt : "<<elmtsInClass[className]<< std::endl;
