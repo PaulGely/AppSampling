@@ -116,12 +116,12 @@ private:
     
     int noDataValue = GetParameterInt("nd");
     
-    unsigned int nbComp = image->GetNumberOfComponentsPerPixel();
+    unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
     
     otb::ogr::Layer preFiltered = vectorData->GetLayer(0);    
     otb::ogr::Feature preFeature = preFiltered.GetFeature(0);
     
-    for(unsigned int comp = 0; comp<nbComp; ++comp)
+    for(unsigned int comp = 0; comp<nbComponents; ++comp)
     {  
       std::ostringstream fieldoss;
       fieldoss<<"b"<<comp;
@@ -132,7 +132,7 @@ private:
     for(int comp = 0; comp < preFeature.ogr().GetFieldCount(); ++comp)
     {  
       std::ostringstream fieldoss;
-      fieldoss<<comp + nbComp;
+      fieldoss<<comp + nbComponents;
       OGRFieldDefn field(preFeature.ogr().GetFieldDefnRef(comp)->GetNameRef(), preFeature.ogr().GetFieldDefnRef(comp)->GetType());
       layer.CreateField(field, true);  
     }  
@@ -146,8 +146,7 @@ private:
 
     //std::cout << "Number of tiles: " << nbTilesX <<" x "<< nbTilesY << std::endl;    
     
-    int test = 0;
-    int nbPixelCount = 0; 
+    int nbPixelsGlobal = 0; 
         
     std::map<int, int> elmtsInClass;
     std::map<unsigned long, int> polygon;
@@ -213,7 +212,7 @@ private:
                   
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
                                   
-            int nbOfPixels = 0;
+            int nbOfPixelsInGeom = 0;
             
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {                          
@@ -227,7 +226,7 @@ private:
               pointOGR.setY(point[1]);
                             
               bool noDataTest = false;            
-              for (unsigned int i=0; i<nbComp; i++)
+              for (unsigned int i=0; i<nbComponents; i++)
               {   
                 if(noDataTest && (pixelValue[i] == noDataValue))
                 {
@@ -237,15 +236,15 @@ private:
                               
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {
-                nbOfPixels++;
-                nbPixelCount++;
+                nbOfPixelsInGeom++;
+                nbPixelsGlobal++;
               }            
             }            
             int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-            //std::cout<< " Nb of Pixels in " << className << " is : " << nbOfPixels << std::endl;
+            //std::cout<< " Nb of Pixels in " << className << " is : " << nbOfPixelsInGeom << std::endl;
             
-            polygon[featIt->ogr().GetFID()] += nbOfPixels;
-            elmtsInClass[className] = elmtsInClass[className] + nbOfPixels;
+            polygon[featIt->ogr().GetFID()] += nbOfPixelsInGeom;
+            elmtsInClass[className] = elmtsInClass[className] + nbOfPixelsInGeom;
           }        
         }
       }     
@@ -256,7 +255,7 @@ private:
     /*
     std::cout<< "Nb de classes : " << elmtsInClass.size() << std::endl;
     
-    std::cout << "Nb nbPixelCount " << nbPixelCount << std::endl;
+    std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
     
     for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
     {
@@ -277,10 +276,10 @@ private:
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
              
-    int counterLeves[elmtsInClass.size()+1];
+    int nbPixelsRaised[elmtsInClass.size()+1];
     for(int b=0; b < elmtsInClass.size()+1; b++)
     {
-      counterLeves[b]=0;
+      nbPixelsRaised[b]=0;
     }
     
     // *** *** 2ème passe : ECHANTILLONAGE   *** ***
@@ -345,10 +344,7 @@ private:
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();       
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
-             
-            int pixC = 0;            
-            int counter=0;
-            
+                                  
             int nbSamples = 2000;
             
             int nbPixelsInPolygon = int ((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));            
@@ -357,11 +353,12 @@ private:
               nbPixelsInPolygon = 1;
             }
             
-            int N = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);       
-            int onlyPixelInPoly = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
+            int periodOfSampling = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);       
+            int randomPositionInPolygon = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
             
-            int counterPlus=N;
-            int next=N;
+            int counterPixelsInPolygon = 0;
+            int counterPixelsInPolygonShited = periodOfSampling;
+            int nextPixelRaisedPosition = periodOfSampling;
             
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
@@ -377,7 +374,7 @@ private:
               pointOGR.setY(point[1]); 
                              
               bool noDataTest = false;            
-              for (unsigned int i=0; i<nbComp; i++)
+              for (unsigned int i=0; i<nbComponents; i++)
               {   
                 if(pixelValue[i] == noDataValue)
                 {
@@ -386,7 +383,7 @@ private:
               }
                             
               /* Random mode */
-              //float proba = float(200)/float(nbPixelCount);
+              //float proba = float(200)/float(nbPixelsGlobal);
               /* Random mode, equally distributed according to the classes. */
               //float proba = (float(2000))/(float(elmtsInClass[className])/**elmtsInClass.size()*/);
               /*
@@ -400,34 +397,34 @@ private:
               /* TESTS POUR ALEATOIRE*/              
               if(polygon[featIt->ogr().GetFID()]!=0)
               {
-                if((counter == polygon[featIt->ogr().GetFID()]/2) && (nbPixelsInPolygon == 1))
+                if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
                 {
                   resultTest= true;
                 }              
                 else if(nbPixelsInPolygon != 1)
                 {
-                  if(counter== int(generator->GetUniformVariate(0, (N/2))))
+                  if(counterPixelsInPolygon== int(generator->GetUniformVariate(0, (periodOfSampling/2))))
                   {
                     resultTest= true;  
                   }
                   
-                  if(counter == next)
+                  if(counterPixelsInPolygon == nextPixelRaisedPosition)
                   {
                     resultTest= true; 
                   }
                   
-                  if(counterPlus%N == 0)
+                  if(counterPixelsInPolygonShited%periodOfSampling == 0)
                   {
                     int sign = generator->GetUniformVariate(0, 1);
-                    int rdm = int(generator->GetUniformVariate(0, (N/2)));   
+                    int rdm = int(generator->GetUniformVariate(0, (periodOfSampling/2)));   
                     
                     if (sign<0.5)
                     {
-                      next = counterPlus - rdm;
+                      nextPixelRaisedPosition = counterPixelsInPolygonShited - rdm;
                     }
                     else
                     {
-                      next = counterPlus + rdm;
+                      nextPixelRaisedPosition = counterPixelsInPolygonShited + rdm;
                     }
                   }                                  
                 }
@@ -435,11 +432,11 @@ private:
               /*
               if(poly[featIt->ogr().GetFID()]!=0)
               {
-                if((counter == poly[featIt->ogr().GetFID()]/2)&&(nombreDePixelsDansCePoly == 1))
+                if((counterPixelsInPolygon == poly[featIt->ogr().GetFID()]/2)&&(nombreDePixelsDansCePoly == 1))
                 {
                   resultTest= true;
                 }              
-                else if((counter%N)==0 && (nombreDePixelsDansCePoly != 1))
+                else if((counter%periodOfSampling)==0 && (nombreDePixelsDansCePoly != 1))
                 {
                   resultTest= true;                  
                 }
@@ -451,15 +448,14 @@ private:
               {   
                 if(resultTest)
                 {
-                  test++;
-                  std::string msg = to_string(className);
+                  std::string message = to_string(className);
                   otb::ogr::Feature dstFeature(layer.GetLayerDefn());       
                   
                   dstFeature.SetGeometry(&pointOGR);     
                             
-                  for (unsigned int i=0; i<nbComp; i++)
+                  for (unsigned int i=0; i<nbComponents; i++)
                   {
-                    msg += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
+                    message += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
                     dstFeature.ogr().SetField(i, pixelValue[i]);    
                   }
                   
@@ -467,38 +463,35 @@ private:
                   {  
                     if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTString )
                     {
-                      dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsString(c));
+                      dstFeature.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsString(c));
                     }  
                     else if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTInteger )
                     {
-                      dstFeature.ogr().SetField(nbComp + c, featIt->ogr().GetFieldAsInteger(c));
+                      dstFeature.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsInteger(c));
                     }
                   }  
                   
-                  //msg += " " + to_string(point[0]) + " " + to_string(point[1]);
+                  //message += " " + to_string(point[0]) + " " + to_string(point[1]);
                   layer.CreateFeature(dstFeature);
-                  myfile << msg << std::endl;  
-                  pixC++;
-                  counterLeves[className]++;
+                  myfile << message << std::endl;  
+                  nbPixelsRaised[className]++;
                 }                
-                counter++; 
-                counterPlus++;
+                counterPixelsInPolygon++; 
+                counterPixelsInPolygonShited++;
               }                
             }  
             //std::cout<<"Pix count elmt : "<<elmtsInClass[className]<< std::endl;
-            //std::cout<<"Pix  : "<<pixC<< std::endl;
           }   
         }
         //std::cout << "*** Flag = " << flag << std::endl;
       }
     }      
-    std::cout << "Nb test " << test << std::endl;
     myfile.close();
+    
     for(int b=1; b < elmtsInClass.size()+1; b++)
     {
-      std::cout<< "Counter Pix leves: "<< counterLeves[b]<< std::endl;
-    }
-    
+      std::cout<< "Number of pixels raised : "<< nbPixelsRaised[b]<< std::endl;
+    }    
   }
 };
 }
