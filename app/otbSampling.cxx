@@ -109,14 +109,18 @@ private:
 
   void DoExecute()
   {  
+    //Input image
     ImageType::Pointer image = GetParameterImage("in");
     image->UpdateOutputInformation();    
     
+    //Output text file
     std::ofstream myfile;
     myfile.open (GetParameterString("out").c_str());
     
+    //Input shape file
     otb::ogr::DataSource::Pointer vectorData = otb::ogr::DataSource::New(GetParameterString("shp").c_str(), otb::ogr::DataSource::Modes::Read);
     
+    //Output shape file
     std::vector<std::string> options;
     std::string projRef = image->GetProjectionRef();
     OGRSpatialReference oSRS(projRef.c_str());
@@ -129,17 +133,22 @@ private:
     layername = layername.substr(0,layername.size()-(extension.size()));
     layer = ogrDS->CreateLayer(layername, &oSRS, wkbPoint, options);
     
+    //No data value for pixels value
     int noDataValue = GetParameterInt("nd");
     
+    //Number of samples we desire for each classes (globaly for the random mode)
     int nbSamples = GetParameterInt("samples");
     
+    //Dimension of a side of the square tiles
     int sizeTiles = GetParameterInt("tiles");
-        
+    
+    //Number of elements in each pixels
     unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
     
+    //Initialisation of the output shape file
     otb::ogr::Layer preFiltered = vectorData->GetLayer(0);    
     otb::ogr::Feature preFeature = preFiltered.GetFeature(0);
-    
+        
     for(unsigned int comp = 0; comp<nbComponents; ++comp)
     {  
       std::ostringstream fieldoss;
@@ -155,7 +164,8 @@ private:
       OGRFieldDefn field(preFeature.ogr().GetFieldDefnRef(comp)->GetNameRef(), preFeature.ogr().GetFieldDefnRef(comp)->GetType());
       layer.CreateField(field, true);  
     }  
-            
+    
+    //Tiling
     unsigned long sizeTilesX = sizeTiles;
     unsigned long sizeTilesY = sizeTiles;
     unsigned long sizeImageX = image->GetLargestPossibleRegion().GetSize()[0];
@@ -163,24 +173,31 @@ private:
     unsigned int nbTilesX    = sizeImageX/sizeTilesX + (sizeImageX%sizeTilesX > 0 ? 1 : 0);
     unsigned int nbTilesY    = sizeImageY/sizeTilesY + (sizeImageY%sizeTilesY > 0 ? 1 : 0);
  
-    
+    //Number of pixels in all the polygons
     int nbPixelsGlobal = 0; 
-        
+    
+    //Number of pixels in each classes
     std::map<int, int> elmtsInClass;
+    
+    //Number of pixels in each polygons
     std::map<unsigned long, int> polygon;
     
     std::cout << " -*-*-*-   1ère Passe   -*-*-*- " << std::endl;
     
     // *** *** 1ère passe : PROSPECTION      *** ***    
+    
+    //Loop across tiles
     for(unsigned int row = 0; row < nbTilesY; ++row)
     {
       for(unsigned int column = 0; column < nbTilesX; ++column)
-      {      
+      {    
+        //Tiles dimensions
         unsigned long startX = column*sizeTilesX;
         unsigned long startY = row*sizeTilesY;
-        unsigned long sizeX  = vcl_min(sizeTilesX+1,sizeImageX-startX+1);
-        unsigned long sizeY  = vcl_min(sizeTilesY+1,sizeImageY-startY+1);
-                
+        unsigned long sizeX  = vcl_min(sizeTilesX,sizeImageX-startX);
+        unsigned long sizeY  = vcl_min(sizeTilesY,sizeImageY-startY);
+        
+        //Part extraction of the image
         ExtractROIFilterType::Pointer extractROIFilter = ExtractROIFilterType::New();
         extractROIFilter->SetInput(image);
         extractROIFilter->SetStartX(startX);
@@ -188,7 +205,8 @@ private:
         extractROIFilter->SetSizeX(sizeX);
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
-                
+        
+        ////Part extraction of the shape file       
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
         ImageType::IndexType urIndex;
@@ -214,20 +232,24 @@ private:
         filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());         
   
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
-             
+        
+        //Loop across the features in the layer
         for(; featIt!=filtered.end(); ++featIt)
         {          
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
           
+          //We are dealing with simple polygons
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {   
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();    
                   
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
-                                  
+            
+            //Number of pixels in a polygon
             int nbOfPixelsInGeom = 0;
             
+            //Loop across pixels in the tile
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {                          
               itk::Point<double, 2> point;
@@ -275,14 +297,13 @@ private:
     //  std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
     //}
     
-    std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
+    //std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
 
     //for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
-    
-    
+       
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
@@ -363,7 +384,7 @@ private:
             int randomPositionInPolygon = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
             
             int counterPixelsInPolygon = 0;
-            int counterPixelsInPolygonShited = periodOfSampling;
+            int counterPixelsInPolygonShifted = periodOfSampling;
             int nextPixelRaisedPosition = periodOfSampling;
             
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
@@ -387,33 +408,33 @@ private:
                   noDataTest = true; 
                 }  
               }
-                  
-              if (samplingMode == "exhaustive")
-              {
-                resultTest= true;
-              }
               
-              if (samplingMode == "random")
+              if(polygon[featIt->ogr().GetFID()]!=0)
               {
-                float proba = float(nbSamples)/float(nbPixelsGlobal);
-                if(generator->GetUniformVariate(0, 1) < proba)
+                if (samplingMode == "exhaustive")
                 {
-                  resultTest= true;        
+                  resultTest= true;
                 }
-              }
-              
-              if (samplingMode == "randomequally")
-              {
-                float proba = (float(nbSamples))/(float(elmtsInClass[className]));
-                if(generator->GetUniformVariate(0, 1) < proba)
+                
+                if (samplingMode == "random")
                 {
-                  resultTest= true;        
+                  float proba = float(nbSamples)/float(nbPixelsGlobal);
+                  if(generator->GetUniformVariate(0, 1) < proba)
+                  {
+                    resultTest= true;        
+                  }
                 }
-              }
-              
-              if (samplingMode == "periodic")
-              {
-                if(polygon[featIt->ogr().GetFID()]!=0)
+                
+                if (samplingMode == "randomequally")
+                {
+                  float proba = (float(nbSamples))/(float(elmtsInClass[className]));
+                  if(generator->GetUniformVariate(0, 1) < proba)
+                  {
+                    resultTest= true;        
+                  }
+                }
+                
+                if (samplingMode == "periodic")
                 {
                   if((counterPixelsInPolygon == polygon[featIt->ogr().GetFID()]/2)&&(nbPixelsInPolygon == 1))
                   {
@@ -424,11 +445,8 @@ private:
                     resultTest= true;                  
                   }
                 }
-              }
-              
-              if (samplingMode == "periodicrandom")
-              {
-                if(polygon[featIt->ogr().GetFID()]!=0)
+                
+                if (samplingMode == "periodicrandom")
                 {
                   if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
                   {
@@ -446,18 +464,18 @@ private:
                       resultTest= true; 
                     }
                     
-                    if(counterPixelsInPolygonShited%periodOfSampling == 0)
+                    if(counterPixelsInPolygonShifted%periodOfSampling == 0)
                     {
                       int sign = generator->GetUniformVariate(0, 1);
                       int rdm = int(generator->GetUniformVariate(0, (periodOfSampling/2)));   
                       
                       if (sign<0.5)
                       {
-                        nextPixelRaisedPosition = counterPixelsInPolygonShited - rdm;
+                        nextPixelRaisedPosition = counterPixelsInPolygonShifted - rdm;
                       }
                       else
                       {
-                        nextPixelRaisedPosition = counterPixelsInPolygonShited + rdm;
+                        nextPixelRaisedPosition = counterPixelsInPolygonShifted + rdm;
                       }
                     }                                  
                   }
@@ -496,7 +514,7 @@ private:
                   nbPixelsRaised[className]++;
                 }                
                 counterPixelsInPolygon++; 
-                counterPixelsInPolygonShited++;
+                counterPixelsInPolygonShifted++;
               }                
             }  
           }   
