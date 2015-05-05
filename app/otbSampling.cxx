@@ -83,6 +83,21 @@ private:
     AddParameter(ParameterType_OutputFilename, "v", "Verification Mask");    
     AddParameter(ParameterType_String, "cfield", "Field of class");
     
+    AddParameter(ParameterType_Choice, "mode", "Mode of sampling");
+    AddChoice("mode.exhaustive", "Exhaustive Sampling");
+    AddChoice("mode.random", "Random Sampling");
+    AddChoice("mode.randomequally", "Random sampling equally distributed according to the classes size");
+    AddChoice("mode.periodic", "Periodic sampling, in all the polygons");
+    AddChoice("mode.periodicrandom", "Periodic sampling, in all the polygons, randomly shifted");
+        
+    AddParameter(ParameterType_Int, "samples", "Number of samples per classes");
+    SetDefaultParameterInt("samples", 2000);
+    MandatoryOff("samples"); 
+    
+    AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
+    SetDefaultParameterInt("tiles", 500);
+    MandatoryOff("tiles");
+    
     AddParameter(ParameterType_Int, "nd", "NoData value");
     SetDefaultParameterInt("nd", 0);
     MandatoryOff("nd"); 
@@ -116,6 +131,10 @@ private:
     
     int noDataValue = GetParameterInt("nd");
     
+    int nbSamples = GetParameterInt("samples");
+    
+    int sizeTiles = GetParameterInt("tiles");
+        
     unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
     
     otb::ogr::Layer preFiltered = vectorData->GetLayer(0);    
@@ -137,14 +156,13 @@ private:
       layer.CreateField(field, true);  
     }  
             
-    unsigned long sizeTilesX = 500;
-    unsigned long sizeTilesY = 500;
+    unsigned long sizeTilesX = sizeTiles;
+    unsigned long sizeTilesY = sizeTiles;
     unsigned long sizeImageX = image->GetLargestPossibleRegion().GetSize()[0];
     unsigned long sizeImageY = image->GetLargestPossibleRegion().GetSize()[1];    
     unsigned int nbTilesX    = sizeImageX/sizeTilesX + (sizeImageX%sizeTilesX > 0 ? 1 : 0);
     unsigned int nbTilesY    = sizeImageY/sizeTilesY + (sizeImageY%sizeTilesY > 0 ? 1 : 0);
-
-    //std::cout << "Number of tiles: " << nbTilesX <<" x "<< nbTilesY << std::endl;    
+ 
     
     int nbPixelsGlobal = 0; 
         
@@ -171,8 +189,6 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
                 
-        //std::cout << "** 1 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << " over " << nbTilesY*nbTilesX << std::endl;    
-
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
         ImageType::IndexType urIndex;
@@ -195,9 +211,7 @@ private:
         lr.setY(lrPoint[1]); 
 
         otb::ogr::Layer filtered = vectorData->GetLayer(0);
-        filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
-  
-        //std::cout<<"Feature count: "<<filtered.GetFeatureCount(true)<<std::endl;          
+        filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());         
   
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
              
@@ -248,33 +262,34 @@ private:
           }        
         }
       }     
-        //std::cout << "*** Flag = " << flag << std::endl;
     }
     
     /* TRACES */
-    /*
-    std::cout<< "Nb de classes : " << elmtsInClass.size() << std::endl;
+    //
+    //std::cout<< "Nb de classes : " << elmtsInClass.size() << std::endl;
     
-    std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
+    //std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
     
-    for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
-    {
-      std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
-    }
+    //for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
+    //{
+    //  std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
+    //}
     
     std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
 
-    for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
-    {
-      std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
-    } 
-    */
+    //for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
+    //{
+    //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
+    //} 
+    
     
     std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
     
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
+    
+    const std::string samplingMode = GetParameterString("mode");
              
     int nbPixelsRaised[elmtsInClass.size()+1];
     for(int b=0; b < elmtsInClass.size()+1; b++)
@@ -298,10 +313,7 @@ private:
         extractROIFilter->SetStartY(startY);
         extractROIFilter->SetSizeX(sizeX);
         extractROIFilter->SetSizeY(sizeY);
-        extractROIFilter->Update();
-                
-        //std::cout << "** 2 **  Tiles nb : " << (row)*(nbTilesY)+(column+1) << "/" << nbTilesX*nbTilesY << std::endl;  
-        //std::cout << "* X : " << row << "  Y : " << column << std::endl;
+        extractROIFilter->Update();                
 
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
@@ -326,16 +338,12 @@ private:
 
         otb::ogr::Layer filtered = vectorData->GetLayer(0);
         filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
-  
-        //std::cout<<"Feature count: "<<filtered.GetFeatureCount(true)<<std::endl;
+        
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
-        
-        
-        
+                
         for(; featIt!=filtered.end(); ++featIt)
         {                     
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
-          //std::cout << "*" << geom->getGeometryName () << std::endl;
           
           int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
                
@@ -344,9 +352,7 @@ private:
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();       
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
-                                  
-            int nbSamples = 2000;
-            
+                                             
             int nbPixelsInPolygon = int ((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));            
             if(nbPixelsInPolygon < 1)
             {
@@ -381,68 +387,82 @@ private:
                   noDataTest = true; 
                 }  
               }
-                            
-              /* Random mode */
-              //float proba = float(200)/float(nbPixelsGlobal);
-              /* Random mode, equally distributed according to the classes. */
-              //float proba = (float(2000))/(float(elmtsInClass[className])/**elmtsInClass.size()*/);
-              /*
-              if(generator->GetUniformVariate(0, 1) < proba)
+                  
+              if (samplingMode == "exhaustive")
               {
-                resultTest= true;                
-                //std::cout<< "Test RDM : " << rdmTest << std::endl;
-              }    
-              */   
+                resultTest= true;
+              }
               
-              /* TESTS POUR ALEATOIRE*/              
-              if(polygon[featIt->ogr().GetFID()]!=0)
+              if (samplingMode == "random")
               {
-                if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
+                float proba = float(nbSamples)/float(nbPixelsGlobal);
+                if(generator->GetUniformVariate(0, 1) < proba)
                 {
-                  resultTest= true;
-                }              
-                else if(nbPixelsInPolygon != 1)
+                  resultTest= true;        
+                }
+              }
+              
+              if (samplingMode == "randomequally")
+              {
+                float proba = (float(nbSamples))/(float(elmtsInClass[className]));
+                if(generator->GetUniformVariate(0, 1) < proba)
                 {
-                  if(counterPixelsInPolygon== int(generator->GetUniformVariate(0, (periodOfSampling/2))))
+                  resultTest= true;        
+                }
+              }
+              
+              if (samplingMode == "periodic")
+              {
+                if(polygon[featIt->ogr().GetFID()]!=0)
+                {
+                  if((counterPixelsInPolygon == polygon[featIt->ogr().GetFID()]/2)&&(nbPixelsInPolygon == 1))
                   {
-                    resultTest= true;  
+                    resultTest= true;
+                  }              
+                  else if((counterPixelsInPolygon%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
+                  {
+                    resultTest= true;                  
                   }
-                  
-                  if(counterPixelsInPolygon == nextPixelRaisedPosition)
+                }
+              }
+              
+              if (samplingMode == "periodicrandom")
+              {
+                if(polygon[featIt->ogr().GetFID()]!=0)
+                {
+                  if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
                   {
-                    resultTest= true; 
-                  }
-                  
-                  if(counterPixelsInPolygonShited%periodOfSampling == 0)
+                    resultTest= true;
+                  }              
+                  else if(nbPixelsInPolygon != 1)
                   {
-                    int sign = generator->GetUniformVariate(0, 1);
-                    int rdm = int(generator->GetUniformVariate(0, (periodOfSampling/2)));   
+                    if(counterPixelsInPolygon== int(generator->GetUniformVariate(0, (periodOfSampling/2))))
+                    {
+                      resultTest= true;  
+                    }
                     
-                    if (sign<0.5)
+                    if(counterPixelsInPolygon == nextPixelRaisedPosition)
                     {
-                      nextPixelRaisedPosition = counterPixelsInPolygonShited - rdm;
+                      resultTest= true; 
                     }
-                    else
+                    
+                    if(counterPixelsInPolygonShited%periodOfSampling == 0)
                     {
-                      nextPixelRaisedPosition = counterPixelsInPolygonShited + rdm;
-                    }
-                  }                                  
+                      int sign = generator->GetUniformVariate(0, 1);
+                      int rdm = int(generator->GetUniformVariate(0, (periodOfSampling/2)));   
+                      
+                      if (sign<0.5)
+                      {
+                        nextPixelRaisedPosition = counterPixelsInPolygonShited - rdm;
+                      }
+                      else
+                      {
+                        nextPixelRaisedPosition = counterPixelsInPolygonShited + rdm;
+                      }
+                    }                                  
+                  }
                 }
               }
-              /*
-              if(poly[featIt->ogr().GetFID()]!=0)
-              {
-                if((counterPixelsInPolygon == poly[featIt->ogr().GetFID()]/2)&&(nombreDePixelsDansCePoly == 1))
-                {
-                  resultTest= true;
-                }              
-                else if((counter%periodOfSampling)==0 && (nombreDePixelsDansCePoly != 1))
-                {
-                  resultTest= true;                  
-                }
-              }
-              */
-              
               
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {   
@@ -471,7 +491,6 @@ private:
                     }
                   }  
                   
-                  //message += " " + to_string(point[0]) + " " + to_string(point[1]);
                   layer.CreateFeature(dstFeature);
                   myfile << message << std::endl;  
                   nbPixelsRaised[className]++;
@@ -480,10 +499,8 @@ private:
                 counterPixelsInPolygonShited++;
               }                
             }  
-            //std::cout<<"Pix count elmt : "<<elmtsInClass[className]<< std::endl;
           }   
         }
-        //std::cout << "*** Flag = " << flag << std::endl;
       }
     }      
     myfile.close();
