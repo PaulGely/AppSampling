@@ -34,7 +34,7 @@
 #include "vcl_algorithm.h"
 #include "otbMultiToMonoChannelExtractROI.h"
 #include <sstream>
-#include <iterator>     // std::advance
+#include <iterator>   
 
 namespace otb
 {
@@ -182,9 +182,9 @@ private:
     //Number of pixels in each polygons
     std::map<unsigned long, int> polygon;
     
-    std::cout << " -*-*-*-   1ère Passe   -*-*-*- " << std::endl;
+    std::cout << " -*-*-*-   1st RUN   -*-*-*- " << std::endl;
     
-    // *** *** 1ère passe : PROSPECTION      *** ***    
+    // *** *** 1st run :  PROSPECTION      *** ***    
     
     //Loop across tiles
     for(unsigned int row = 0; row < nbTilesY; ++row)
@@ -197,7 +197,7 @@ private:
         unsigned long sizeX  = vcl_min(sizeTilesX,sizeImageX-startX);
         unsigned long sizeY  = vcl_min(sizeTilesY,sizeImageY-startY);
         
-        //Part extraction of the image
+        //Extraction of the image
         ExtractROIFilterType::Pointer extractROIFilter = ExtractROIFilterType::New();
         extractROIFilter->SetInput(image);
         extractROIFilter->SetStartX(startX);
@@ -206,7 +206,7 @@ private:
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
         
-        ////Part extraction of the shape file       
+        //Extraction of the shape file       
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
         ImageType::IndexType urIndex;
@@ -242,8 +242,7 @@ private:
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {   
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);
-            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();    
-                  
+            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
             
             //Number of pixels in a polygon
@@ -255,12 +254,15 @@ private:
               itk::Point<double, 2> point;
               extractROIFilter->GetOutput()->TransformIndexToPhysicalPoint(it.GetIndex(), point);           
               
+              //Access to the pixel value 
               ImageType::PixelType pixelValue = it.Get();
-                            
+              
+              //Tranformation in OGRPoint in order to know if it's in the geometry
               OGRPoint pointOGR;
               pointOGR.setX(point[0]);
               pointOGR.setY(point[1]);
-                            
+              
+              //Test if the pixel is not a "No-Data-Pixel", with one of its elmts = 0
               bool noDataTest = false;            
               for (unsigned int i=0; i<nbComponents; i++)
               {   
@@ -269,16 +271,19 @@ private:
                   noDataTest = true; 
                 }  
               }              
-                              
+              
+              //If the pixel is not "No-Data" and is in the geometry, them we count it
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
               {
                 nbOfPixelsInGeom++;
                 nbPixelsGlobal++;
               }            
-            }            
-            int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-            //std::cout<< " Nb of Pixels in " << className << " is : " << nbOfPixelsInGeom << std::endl;
+            }
             
+            //Class name recuperation
+            int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
+            
+            //Counters update, number of pixel in each classes and in each polygones 
             polygon[featIt->ogr().GetFID()] += nbOfPixelsInGeom;
             elmtsInClass[className] = elmtsInClass[className] + nbOfPixelsInGeom;
           }        
@@ -304,30 +309,36 @@ private:
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
        
-    std::cout << " -*-*-*-   2ème Passe   -*-*-*- " << std::endl;
+    std::cout << " -*-*-*-   2nd RUN   -*-*-*- " << std::endl;
     
+    //Initialisation of the random generator
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
     
+    //Mode recuperation from the parameter
     const std::string samplingMode = GetParameterString("mode");
-             
+    
+    //Initialisation counter of pixel raised in each classes
     int nbPixelsRaised[elmtsInClass.size()+1];
     for(int b=0; b < elmtsInClass.size()+1; b++)
     {
       nbPixelsRaised[b]=0;
     }
     
-    // *** *** 2ème passe : ECHANTILLONAGE   *** ***
+    // *** *** 2nd run : SAMPLING   *** ***
+    //Loop across tiles
     for(unsigned int row = 0; row < nbTilesY; ++row)
     {
       for(unsigned int column = 0; column < nbTilesX; ++column)
       {      
+        //Tiles dimensions
         unsigned long startX = column*sizeTilesX;
         unsigned long startY = row*sizeTilesY;
         unsigned long sizeX  = vcl_min(sizeTilesX,sizeImageX-startX);
         unsigned long sizeY  = vcl_min(sizeTilesY,sizeImageY-startY);
-                
+        
+        //Extraction of the image
         ExtractROIFilterType::Pointer extractROIFilter = ExtractROIFilterType::New();
         extractROIFilter->SetInput(image);
         extractROIFilter->SetStartX(startX);
@@ -335,7 +346,8 @@ private:
         extractROIFilter->SetSizeX(sizeX);
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();                
-
+        
+        //Extraction of the shape file
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
         ImageType::IndexType urIndex;
@@ -361,45 +373,64 @@ private:
         filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
         
         otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
-                
+        
+        //Loop across the features in the layer
         for(; featIt!=filtered.end(); ++featIt)
         {                     
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
           
+          //Class name recuperation
           int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-               
+          
+          //We are dealing with simple polygons
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();       
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
-                                             
-            int nbPixelsInPolygon = int ((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));            
+             
+            //Compute the number of pixel we need to sample in each polygons
+            int nbPixelsInPolygon = int ((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));    
+            
+            //If this number is less then 1, we force it to be 1
             if(nbPixelsInPolygon < 1)
             {
               nbPixelsInPolygon = 1;
             }
             
-            int periodOfSampling = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);       
+            //Compute of the period of sampling, every n-pixels we raise one
+            int periodOfSampling = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);    
+            
+            //Generation of a random number for the sampling in a polygon where we only need one pixel, it's choosen randomly
             int randomPositionInPolygon = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
             
+            //Counters initialisations
+            //Counter of pixels in the current polygon
             int counterPixelsInPolygon = 0;
+            //Shifted counter, to anticipate the position of the next raised pixel
             int counterPixelsInPolygonShifted = periodOfSampling;
+            //Position of the next pixel raised
             int nextPixelRaisedPosition = periodOfSampling;
             
+            //Loop across pixels in the tile
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
               itk::Point<double, 2> point;
-                            
+              
+              //Boolean variable, we sample the current pixel or not
               bool resultTest = false;
                                          
               extractROIFilter->GetOutput()->TransformIndexToPhysicalPoint(it.GetIndex(), point); 
+              
+              //Access to the pixel value
               ImageType::PixelType pixelValue = it.Get();
-                      
+               
+              //Tranformation in OGRPoint in order to know if it's in the geometry
               OGRPoint pointOGR;
               pointOGR.setX(point[0]);
               pointOGR.setY(point[1]); 
-                             
+              
+              //Test if the pixel is not a "No-Data-Pixel", with one of its elmts = 0
               bool noDataTest = false;            
               for (unsigned int i=0; i<nbComponents; i++)
               {   
@@ -409,61 +440,77 @@ private:
                 }  
               }
               
+              //Pre-test is the polygon at least one pixel
               if(polygon[featIt->ogr().GetFID()]!=0)
               {
+                //Succession of tests to know in whoch mode we are
+                //Exhautive mode : we extract all pixels in every polygons in every classes
                 if (samplingMode == "exhaustive")
                 {
                   resultTest= true;
                 }
                 
+                //Random mode : we extract nbSamples pixels randomly in all the image
                 if (samplingMode == "random")
                 {
-                  float proba = float(nbSamples)/float(nbPixelsGlobal);
-                  if(generator->GetUniformVariate(0, 1) < proba)
+                  //The probability of sampling a pixel is function of the number of pixels in every classes
+                  float probability = float(nbSamples)/float(nbPixelsGlobal);
+                  if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
                   }
                 }
                 
+                //Random mode equally : we extract nbSAmples pixels for each classes
                 if (samplingMode == "randomequally")
                 {
-                  float proba = (float(nbSamples))/(float(elmtsInClass[className]));
-                  if(generator->GetUniformVariate(0, 1) < proba)
+                  //The probability of sampling a pixel is function of the number of pixels in each classes
+                  float probability = (float(nbSamples))/(float(elmtsInClass[className]));
+                  if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
                   }
                 }
                 
+                //Periodic : we extract, more or less, nbsamples pixels for each classes every n pixels
                 if (samplingMode == "periodic")
                 {
-                  if((counterPixelsInPolygon == polygon[featIt->ogr().GetFID()]/2)&&(nbPixelsInPolygon == 1))
+                  //In a polygon where we only need one pixel, we raise it at a radom position
+                  if((counterPixelsInPolygon == randomPositionInPolygon)&&(nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
-                  }              
-                  else if((counterPixelsInPolygon%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
+                  } 
+                  //If wee need more then one pixel in the polygon, we sample a pixel periodicly, every n-pixels
+                  if((counterPixelsInPolygon%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
                   {
                     resultTest= true;                  
                   }
                 }
                 
+                //Periodic random : we extract, more or less, nbsmaples pixels for each classes every n+-delta pixels ( 0<delta<n/2 )
                 if (samplingMode == "periodicrandom")
                 {
+                  //In a polygon where we only need one pixel, we raise it at a radom position
                   if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
-                  }              
+                  } 
+                  //If we need more then one pixel in the polygon
                   else if(nbPixelsInPolygon != 1)
                   {
-                    if(counterPixelsInPolygon== int(generator->GetUniformVariate(0, (periodOfSampling/2))))
+                    //The first pixel raised is randomly choosen
+                    if(counterPixelsInPolygon == int(generator->GetUniformVariate(0, (periodOfSampling/2))))
                     {
                       resultTest= true;  
                     }
                     
+                    //We raised the pixel if we are at the good position
                     if(counterPixelsInPolygon == nextPixelRaisedPosition)
                     {
                       resultTest= true; 
                     }
                     
+                    //Every n-pixels we compute the position of the next pixel sampled
                     if(counterPixelsInPolygonShifted%periodOfSampling == 0)
                     {
                       int sign = generator->GetUniformVariate(0, 1);
@@ -482,37 +529,44 @@ private:
                 }
               }
               
+              //If the pixel is not "No-Data" and is in the geometry, them we count it
               if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
-              {   
+              {  
+                //Test if the current pixel is good to sample or not
                 if(resultTest)
                 {
                   std::string message = to_string(className);
-                  otb::ogr::Feature dstFeature(layer.GetLayerDefn());       
+                  otb::ogr::Feature featureOutput(layer.GetLayerDefn());       
                   
-                  dstFeature.SetGeometry(&pointOGR);     
-                            
+                  //Adding the raised pixel to our output shape file
+                  featureOutput.SetGeometry(&pointOGR);     
+                    
+                  //Completing the text and shape output files with the pixel values
                   for (unsigned int i=0; i<nbComponents; i++)
                   {
                     message += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
-                    dstFeature.ogr().SetField(i, pixelValue[i]);    
+                    featureOutput.ogr().SetField(i, pixelValue[i]);    
                   }
                   
+                  //We also add informations about where the pixel is extract from
                   for(int c = 0; c < preFeature.ogr().GetFieldCount(); ++c)
                   {  
                     if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTString )
                     {
-                      dstFeature.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsString(c));
+                      featureOutput.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsString(c));
                     }  
                     else if(featIt->ogr().GetFieldDefnRef(c)->GetType() == OFTInteger )
                     {
-                      dstFeature.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsInteger(c));
+                      featureOutput.ogr().SetField(nbComponents + c, featIt->ogr().GetFieldAsInteger(c));
                     }
                   }  
                   
-                  layer.CreateFeature(dstFeature);
-                  myfile << message << std::endl;  
+                  layer.CreateFeature(featureOutput);
+                  myfile << message << std::endl; 
+                  //Incrementation of the counter of raised pixels in each classes
                   nbPixelsRaised[className]++;
-                }                
+                }    
+                //Incrementation of counters of pixels studied
                 counterPixelsInPolygon++; 
                 counterPixelsInPolygonShifted++;
               }                
@@ -523,6 +577,7 @@ private:
     }      
     myfile.close();
     
+    //Output the number of pixel sampled in each classes.
     for(int b=1; b < elmtsInClass.size()+1; b++)
     {
       std::cout<< "Number of pixels raised : "<< nbPixelsRaised[b]<< std::endl;
