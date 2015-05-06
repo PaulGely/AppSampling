@@ -182,7 +182,11 @@ private:
     //Number of pixels in each polygons
     std::map<unsigned long, int> polygon;
     
-    std::cout << " -*-*-*-   1st RUN   -*-*-*- " << std::endl;
+    //Varibles to build 
+    int stepsProgression = 0;
+    int currentProgression;
+    
+    otbAppLogINFO(<< "Computing the number of pixels for each polygons and classes" << std::endl);
     
     // *** *** 1st run :  PROSPECTION      *** ***    
     
@@ -190,7 +194,15 @@ private:
     for(unsigned int row = 0; row < nbTilesY; ++row)
     {
       for(unsigned int column = 0; column < nbTilesX; ++column)
-      {    
+      { 
+        //Progression bar printing
+        currentProgression = ((row)*(nbTilesY)+(column+1))*10/(nbTilesX*nbTilesY);        
+        if(currentProgression > stepsProgression)
+        {
+          std::cout<<stepsProgression*10<<"%..."<<std::flush;
+          stepsProgression++;
+        } 
+        
         //Tiles dimensions
         unsigned long startX = column*sizeTilesX;
         unsigned long startY = row*sizeTilesY;
@@ -205,7 +217,7 @@ private:
         extractROIFilter->SetSizeX(sizeX);
         extractROIFilter->SetSizeY(sizeY);
         extractROIFilter->Update();
-        
+                 
         //Extraction of the shape file       
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
@@ -286,11 +298,15 @@ private:
             
             //Counters update, number of pixel in each classes and in each polygones 
             polygon[featIt->ogr().GetFID()] += nbOfPixelsInGeom;
-            elmtsInClass[className] = elmtsInClass[className] + nbOfPixelsInGeom;
-          }        
-        }
+
+            elmtsInClass[className] = elmtsInClass[className] + nbOfPixelsInGeom;                                  
+          }   
+        }      
       }     
     }
+    
+    //End of progression bar
+    std::cout<<"100%"<<std::endl;
     
     /* TRACES */
     //
@@ -309,16 +325,22 @@ private:
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
-       
-    std::cout << " -*-*-*-   2nd RUN   -*-*-*- " << std::endl;
+     
+     
+    //Mode recuperation from the parameter
+    const std::string samplingMode = GetParameterString("mode");
+    
+    otbAppLogINFO(<< "Sampling pixels with the sampling mode : " << samplingMode << std::endl);
+    
+    //Progression bar re-initialisation
+    stepsProgression = 0;    
     
     //Initialisation of the random generator
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
     
-    //Mode recuperation from the parameter
-    const std::string samplingMode = GetParameterString("mode");
+    
     
     //Initialisation counter of pixel raised in each classes
     int nbPixelsRaised[elmtsInClass.size()+1];
@@ -332,7 +354,15 @@ private:
     for(unsigned int row = 0; row < nbTilesY; ++row)
     {
       for(unsigned int column = 0; column < nbTilesX; ++column)
-      {      
+      {         
+        //Progression bar printing
+        currentProgression = ((row)*(nbTilesY)+(column+1))*10/(nbTilesX*nbTilesY);        
+        if(currentProgression > stepsProgression)
+        {
+          std::cout<<stepsProgression*10<<"%..."<<std::flush;
+          stepsProgression++;
+        }
+        
         //Tiles dimensions
         unsigned long startX = column*sizeTilesX;
         unsigned long startY = row*sizeTilesY;
@@ -346,8 +376,8 @@ private:
         extractROIFilter->SetStartY(startY);
         extractROIFilter->SetSizeX(sizeX);
         extractROIFilter->SetSizeY(sizeY);
-        extractROIFilter->Update();                
-        
+        extractROIFilter->Update();           
+                
         //Extraction of the shape file
         OGRLinearRing spatialFilterRing;
         OGRPoint ul,ur,lr,ll;
@@ -578,10 +608,13 @@ private:
     }      
     myfile.close();
     
+    //End of progression bar
+    std::cout<<std::endl;
+    
     //Output the number of pixel sampled in each classes.
     for(int b=1; b < elmtsInClass.size()+1; b++)
     {
-      std::cout<< "Number of pixels raised : "<< nbPixelsRaised[b]<< std::endl;
+      otbAppLogINFO(<< "Number of pixels raised in class " << b << " : "<< nbPixelsRaised[b]<< std::endl);
     }    
   }
 };
