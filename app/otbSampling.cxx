@@ -273,7 +273,8 @@ private:
               }              
               
               //If the pixel is not "No-Data" and is in the geometry, them we count it
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
+              //isPointOnRingBoundary() is not relevent beacause there is not (or very few) pixel excatly on the line boundary...
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) /*&& !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE))*/)
               {
                 nbOfPixelsInGeom++;
                 nbPixelsGlobal++;
@@ -530,7 +531,7 @@ private:
               }
               
               //If the pixel is not "No-Data" and is in the geometry, them we count it
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) )
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) && !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE)))
               {  
                 //Test if the current pixel is good to sample or not
                 if(resultTest)
