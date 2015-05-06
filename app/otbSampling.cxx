@@ -390,7 +390,7 @@ private:
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
              
             //Compute the number of pixel we need to sample in each polygons
-            int nbPixelsInPolygon = int ((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));    
+            int nbPixelsInPolygon = static_cast<int>((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));    
             
             //If this number is less then 1, we force it to be 1
             if(nbPixelsInPolygon < 1)
@@ -399,10 +399,10 @@ private:
             }
             
             //Compute of the period of sampling, every n-pixels we raise one
-            int periodOfSampling = int(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);    
+            int periodOfSampling = static_cast<int>(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);    
             
             //Generation of a random number for the sampling in a polygon where we only need one pixel, it's choosen randomly
-            int randomPositionInPolygon = int(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
+            int randomPositionInPolygon = static_cast<int>(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
             
             //Counters initialisations
             //Counter of pixels in the current polygon
@@ -454,7 +454,7 @@ private:
                 if (samplingMode == "random")
                 {
                   //The probability of sampling a pixel is function of the number of pixels in every classes
-                  float probability = float(nbSamples)/float(nbPixelsGlobal);
+                  float probability = static_cast<float>(nbSamples)/static_cast<float>(nbPixelsGlobal);
                   if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
@@ -465,7 +465,7 @@ private:
                 if (samplingMode == "randomequally")
                 {
                   //The probability of sampling a pixel is function of the number of pixels in each classes
-                  float probability = (float(nbSamples))/(float(elmtsInClass[className]));
+                  float probability = static_cast<float>(nbSamples)/static_cast<float>(elmtsInClass[className]);
                   if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
@@ -499,7 +499,7 @@ private:
                   else if(nbPixelsInPolygon != 1)
                   {
                     //The first pixel raised is randomly choosen
-                    if(counterPixelsInPolygon == int(generator->GetUniformVariate(0, (periodOfSampling/2))))
+                    if(counterPixelsInPolygon == static_cast<int>(generator->GetUniformVariate(0, (periodOfSampling/2))))
                     {
                       resultTest= true;  
                     }
@@ -514,7 +514,7 @@ private:
                     if(counterPixelsInPolygonShifted%periodOfSampling == 0)
                     {
                       int sign = generator->GetUniformVariate(0, 1);
-                      int rdm = int(generator->GetUniformVariate(0, (periodOfSampling/2)));   
+                      int rdm = static_cast<int>(generator->GetUniformVariate(0, (periodOfSampling/2)));   
                       
                       if (sign<0.5)
                       {
@@ -530,7 +530,7 @@ private:
               }
               
               //If the pixel is not "No-Data" and is in the geometry, them we count it
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE))
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) )
               {  
                 //Test if the current pixel is good to sample or not
                 if(resultTest)
