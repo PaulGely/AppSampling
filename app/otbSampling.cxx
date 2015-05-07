@@ -101,6 +101,9 @@ private:
     AddParameter(ParameterType_Int, "nd", "NoData value");
     SetDefaultParameterInt("nd", 0);
     MandatoryOff("nd"); 
+    
+    AddParameter(ParameterType_Int, "rand", "Seed value for Mersenne Twister Random Generator");
+    MandatoryOff("rand"); 
   }
 
   void DoUpdateParameters()
@@ -141,6 +144,12 @@ private:
     
     //Dimension of a side of the square tiles
     int sizeTiles = GetParameterInt("tiles");
+    
+    //Seed value for Mersenne Twister Random Generator 
+    int seed = GetParameterInt("rand");
+    
+    //Mode recuperation from the parameter
+    const std::string samplingMode = GetParameterString("mode");
     
     //Number of elements in each pixels
     unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
@@ -249,12 +258,12 @@ private:
         for(; featIt!=filtered.end(); ++featIt)
         {          
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
-          
+                    
           //We are dealing with simple polygons
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {   
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);
-            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();
+            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing();
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
             
             //Number of pixels in a polygon
@@ -283,14 +292,32 @@ private:
                   noDataTest = true; 
                 }  
               }              
+                            
               
               //If the pixel is not "No-Data" and is in the geometry, them we count it
               //isPointOnRingBoundary() is not relevent beacause there is not (or very few) pixel excatly on the line boundary...
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) /*&& !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE))*/)
+              /*&& !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE))*/
+                            
+              //Test if the current pixel is in a polygon hole
+              bool isNotInHole = true;
+              
+              for (int i=0; i < inPolygon->getNumInteriorRings(); ++i)
+              {
+                if(inPolygon->getInteriorRing(i) != NULL)
+                {
+                  OGRLinearRing * interiorRing = inPolygon->getInteriorRing(i);
+                  if(interiorRing->isPointInRing(&pointOGR, TRUE))
+                  {
+                    isNotInHole = false;
+                  }
+                }
+              }
+              
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) && isNotInHole)
               {
                 nbOfPixelsInGeom++;
                 nbPixelsGlobal++;
-              }            
+              }                    
             }
             
             //Class name recuperation
@@ -325,11 +352,7 @@ private:
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
-     
-     
-    //Mode recuperation from the parameter
-    const std::string samplingMode = GetParameterString("mode");
-    
+        
     otbAppLogINFO(<< "Sampling pixels with the sampling mode : " << samplingMode << std::endl);
     
     //Progression bar re-initialisation
@@ -339,9 +362,8 @@ private:
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
-    
-    
-    
+    generator->SetSeed(seed);
+        
     //Initialisation counter of pixel raised in each classes
     int nbPixelsRaised[elmtsInClass.size()+1];
     for(int b=0; b < elmtsInClass.size()+1; b++)
@@ -417,7 +439,8 @@ private:
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
-            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing ();       
+            OGRLinearRing * exteriorRing = inPolygon->getExteriorRing(); 
+            
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
              
             //Compute the number of pixel we need to sample in each polygons
@@ -560,9 +583,25 @@ private:
                 }
               }
               
-              //If the pixel is not "No-Data" and is in the geometry, them we count it
-              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) && !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE)))
-              {  
+              //Test if the current pixel is in a polygon hole
+              bool isNotInHole = true;
+              
+              for (int i=0; i != inPolygon->getNumInteriorRings(); ++i)
+              {
+                if(inPolygon->getInteriorRing(i) != NULL)
+                {
+                  OGRLinearRing * interiorRing = inPolygon->getInteriorRing(i);
+                  if(interiorRing->isPointInRing(&pointOGR, TRUE))
+                  {
+                    isNotInHole = false;
+                  }
+                }
+              }  
+              
+              //If the pixel is not "No-Data" and is in the geometry, them we count it              
+              /*&& !(exteriorRing->isPointOnRingBoundary(&pointOGR, TRUE))*/
+              if(!noDataTest && exteriorRing->isPointInRing(&pointOGR, TRUE) && isNotInHole )
+              {              
                 //Test if the current pixel is good to sample or not
                 if(resultTest)
                 {
@@ -609,7 +648,7 @@ private:
     myfile.close();
     
     //End of progression bar
-    std::cout<<std::endl;
+    std::cout<<std::endl;    
     
     //Output the number of pixel sampled in each classes.
     for(int b=1; b < elmtsInClass.size()+1; b++)
