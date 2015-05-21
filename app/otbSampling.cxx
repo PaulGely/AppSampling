@@ -95,7 +95,7 @@ private:
     MandatoryOff("samples"); 
     
     AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
-    SetDefaultParameterInt("tiles", 500);
+    SetDefaultParameterInt("tiles", 1000);
     MandatoryOff("tiles");
     
     AddParameter(ParameterType_Int, "nd", "NoData value");
@@ -291,8 +291,7 @@ private:
                 {
                   noDataTest = true; 
                 }  
-              }              
-                            
+              }             
               
               //If the pixel is not "No-Data" and is in the geometry, them we count it
               //isPointOnRingBoundary() is not relevent beacause there is not (or very few) pixel excatly on the line boundary...
@@ -348,6 +347,9 @@ private:
     
     //std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
 
+    std::cout << "NB pixels in poly voisin blue petit... : " << polygon[320] << "." << std::endl;
+    std::cout << "NB pixels in poly vide... : " << polygon[920] << "." << std::endl;
+    
     //for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
@@ -466,6 +468,13 @@ private:
             //Position of the next pixel raised
             int nextPixelRaisedPosition = periodOfSampling;
             
+            if(featIt->ogr().GetFID() == 920)
+            {
+              std::cout << "Nb de pix a sampler dans ce poly : " << nbPixelsInPolygon << std::endl;
+            }
+           
+           
+            
             //Loop across pixels in the tile
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
@@ -530,11 +539,11 @@ private:
                 if (samplingMode == "periodic")
                 {
                   //In a polygon where we only need one pixel, we raise it at a radom position
-                  if((counterPixelsInPolygon == randomPositionInPolygon)&&(nbPixelsInPolygon == 1))
+                  if((counterPixelsInPolygon == 1/*randomPositionInPolygon*/)&&(nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
                   } 
-                  //If wee need more then one pixel in the polygon, we sample a pixel periodicly, every n-pixels
+                  //If we need more then one pixel in the polygon, we sample a pixel periodicly, every n-pixels
                   if((counterPixelsInPolygon%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
                   {
                     resultTest= true;                  
