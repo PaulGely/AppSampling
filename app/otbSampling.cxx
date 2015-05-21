@@ -95,7 +95,7 @@ private:
     MandatoryOff("samples"); 
     
     AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
-    SetDefaultParameterInt("tiles", 1000);
+    SetDefaultParameterInt("tiles", 500);
     MandatoryOff("tiles");
     
     AddParameter(ParameterType_Int, "nd", "NoData value");
@@ -190,12 +190,24 @@ private:
     
     //Number of pixels in each polygons
     std::map<unsigned long, int> polygon;
+    //Counter of pixels in the current polygon
+    std::map<unsigned long, int> counterPixelsInPolygon;
+    //Shifted counter of pixels in the current polygon
+    std::map<unsigned long, int> counterPixelsInPolygonShifted;
+    //RandomPosition of a sampled pixel for each polygons
+    std::map<unsigned long, int> randomPositionInPolygon;
     
-    //Varibles to build 
+    //Varibles to build the progression bar
     int stepsProgression = 0;
     int currentProgression;
     
     otbAppLogINFO(<< "Computing the number of pixels for each polygons and classes" << std::endl);
+    
+    //Initialisation of the random generator
+    typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
+    GeneratorType::Pointer generator = GeneratorType::New();
+    generator->Initialize();
+    generator->SetSeed(seed);
     
     // *** *** 1st run :  PROSPECTION      *** ***    
     
@@ -324,7 +336,8 @@ private:
             
             //Counters update, number of pixel in each classes and in each polygones 
             polygon[featIt->ogr().GetFID()] += nbOfPixelsInGeom;
-
+            //Generation of a random number for the sampling in a polygon where we only need one pixel, it's choosen randomly
+            randomPositionInPolygon[featIt->ogr().GetFID()] = static_cast<int>(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
             elmtsInClass[className] = elmtsInClass[className] + nbOfPixelsInGeom;                                  
           }   
         }      
@@ -347,24 +360,20 @@ private:
     
     //std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
 
-    std::cout << "NB pixels in poly voisin blue petit... : " << polygon[320] << "." << std::endl;
-    std::cout << "NB pixels in poly vide... : " << polygon[920] << "." << std::endl;
+    //std::cout << "NB pixels in poly vide... : " << polygon[539] << "." << std::endl;
     
     //for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
+    
         
     otbAppLogINFO(<< "Sampling pixels with the sampling mode : " << samplingMode << std::endl);
     
     //Progression bar re-initialisation
     stepsProgression = 0;    
     
-    //Initialisation of the random generator
-    typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
-    GeneratorType::Pointer generator = GeneratorType::New();
-    generator->Initialize();
-    generator->SetSeed(seed);
+    
         
     //Initialisation counter of pixel raised in each classes
     int nbPixelsRaised[elmtsInClass.size()+1];
@@ -456,25 +465,19 @@ private:
             
             //Compute of the period of sampling, every n-pixels we raise one
             int periodOfSampling = static_cast<int>(polygon[featIt->ogr().GetFID()]/nbPixelsInPolygon);    
-            
-            //Generation of a random number for the sampling in a polygon where we only need one pixel, it's choosen randomly
-            int randomPositionInPolygon = static_cast<int>(generator->GetUniformVariate(0, polygon[featIt->ogr().GetFID()]));
-            
-            //Counters initialisations
-            //Counter of pixels in the current polygon
-            int counterPixelsInPolygon = 0;
-            //Shifted counter, to anticipate the position of the next raised pixel
-            int counterPixelsInPolygonShifted = periodOfSampling;
+                        
+            //Counters initialisations            
+            //Shifted counter, to anticipate the position of the next raised pixel            
+            counterPixelsInPolygonShifted[featIt->ogr().GetFID()] = counterPixelsInPolygon[featIt->ogr().GetFID()] + periodOfSampling;
             //Position of the next pixel raised
             int nextPixelRaisedPosition = periodOfSampling;
             
-            if(featIt->ogr().GetFID() == 920)
+            if(featIt->ogr().GetFID() == 539)
             {
               std::cout << "Nb de pix a sampler dans ce poly : " << nbPixelsInPolygon << std::endl;
+              std::cout << "RandomPosition : " << randomPositionInPolygon[featIt->ogr().GetFID()] << std::endl;
             }
-           
-           
-            
+                       
             //Loop across pixels in the tile
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
@@ -539,12 +542,12 @@ private:
                 if (samplingMode == "periodic")
                 {
                   //In a polygon where we only need one pixel, we raise it at a radom position
-                  if((counterPixelsInPolygon == 1/*randomPositionInPolygon*/)&&(nbPixelsInPolygon == 1))
+                  if((counterPixelsInPolygon[featIt->ogr().GetFID()] == randomPositionInPolygon[featIt->ogr().GetFID()])&&(nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
                   } 
                   //If we need more then one pixel in the polygon, we sample a pixel periodicly, every n-pixels
-                  if((counterPixelsInPolygon%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
+                  if((counterPixelsInPolygon[featIt->ogr().GetFID()]%periodOfSampling)==0 && (nbPixelsInPolygon != 1))
                   {
                     resultTest= true;                  
                   }
@@ -554,7 +557,7 @@ private:
                 if (samplingMode == "periodicrandom")
                 {
                   //In a polygon where we only need one pixel, we raise it at a radom position
-                  if((counterPixelsInPolygon == randomPositionInPolygon) && (nbPixelsInPolygon == 1))
+                  if((counterPixelsInPolygon[featIt->ogr().GetFID()] == randomPositionInPolygon[featIt->ogr().GetFID()]) && (nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
                   } 
@@ -562,30 +565,30 @@ private:
                   else if(nbPixelsInPolygon != 1)
                   {
                     //The first pixel raised is randomly choosen
-                    if(counterPixelsInPolygon == static_cast<int>(generator->GetUniformVariate(0, (periodOfSampling/2))))
+                    if(counterPixelsInPolygon[featIt->ogr().GetFID()] == static_cast<int>(generator->GetUniformVariate(0, (periodOfSampling/2))))
                     {
                       resultTest= true;  
                     }
                     
                     //We raised the pixel if we are at the good position
-                    if(counterPixelsInPolygon == nextPixelRaisedPosition)
+                    if(counterPixelsInPolygon[featIt->ogr().GetFID()] == nextPixelRaisedPosition)
                     {
                       resultTest= true; 
                     }
                     
                     //Every n-pixels we compute the position of the next pixel sampled
-                    if(counterPixelsInPolygonShifted%periodOfSampling == 0)
+                    if(counterPixelsInPolygonShifted[featIt->ogr().GetFID()]%periodOfSampling == 0)
                     {
                       int sign = generator->GetUniformVariate(0, 1);
                       int rdm = static_cast<int>(generator->GetUniformVariate(0, (periodOfSampling/2)));   
                       
                       if (sign<0.5)
                       {
-                        nextPixelRaisedPosition = counterPixelsInPolygonShifted - rdm;
+                        nextPixelRaisedPosition = counterPixelsInPolygonShifted[featIt->ogr().GetFID()] - rdm;
                       }
                       else
                       {
-                        nextPixelRaisedPosition = counterPixelsInPolygonShifted + rdm;
+                        nextPixelRaisedPosition = counterPixelsInPolygonShifted[featIt->ogr().GetFID()] + rdm;
                       }
                     }                                  
                   }
@@ -646,8 +649,8 @@ private:
                   nbPixelsRaised[className]++;
                 }    
                 //Incrementation of counters of pixels studied
-                counterPixelsInPolygon++; 
-                counterPixelsInPolygonShifted++;
+                counterPixelsInPolygon[featIt->ogr().GetFID()]++;
+                counterPixelsInPolygonShifted[featIt->ogr().GetFID()]++;
               }                
             }  
           }   
