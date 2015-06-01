@@ -138,10 +138,7 @@ private:
     
     //No data value for pixels value
     int noDataValue = GetParameterInt("nd");
-    
-    //Number of samples we desire for each classes (globaly for the random mode)
-    int nbSamples = GetParameterInt("samples");
-    
+        
     //Dimension of a side of the square tiles
     int sizeTiles = GetParameterInt("tiles");
     
@@ -209,6 +206,8 @@ private:
     generator->Initialize();
     generator->SetSeed(seed);
     
+    int polyForced = 0;
+            
     // *** *** 1st run :  PROSPECTION      *** ***    
     
     //Loop across tiles
@@ -270,9 +269,23 @@ private:
         for(; featIt!=filtered.end(); ++featIt)
         {          
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
+          
+          bool testPoly = false;
+          bool testLineBuffers = false;
+          if(geom->getGeometryType() == wkbLineString)
+          {
+            geom = geom->Buffer(3);
+            //std::cout<< "Coord : " << geom->getCoordinateDimension() << std::endl;
+            testLineBuffers = true;
+          }
+          
+          if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
+          {
+            testPoly = true;
+          }
                     
           //We are dealing with simple polygons
-          if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
+          if(testPoly || testLineBuffers)
           {   
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing();
@@ -294,7 +307,7 @@ private:
               OGRPoint pointOGR;
               pointOGR.setX(point[0]);
               pointOGR.setY(point[1]);
-              
+                            
               //Test if the pixel is not a "No-Data-Pixel", with one of its elmts = 0
               bool noDataTest = false;            
               for (unsigned int i=0; i<nbComponents; i++)
@@ -349,9 +362,9 @@ private:
     
     /* TRACES */
     //
-    //std::cout<< "Nb de classes : " << elmtsInClass.size() << std::endl;
+    std::cout<< "Nb de classes : " << elmtsInClass.size() << std::endl;
     
-    //std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
+    std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
     
     //for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
     //{
@@ -377,9 +390,18 @@ private:
         
     //Initialisation counter of pixel raised in each classes
     int nbPixelsRaised[elmtsInClass.size()+1];
+    int nbSamples[elmtsInClass.size()+1];
     for(int b=0; b < elmtsInClass.size()+1; b++)
     {
       nbPixelsRaised[b]=0;
+      
+      //Number of samples we desire for each classes (globaly for the random mode)   
+      nbSamples[b] = GetParameterInt("samples");
+      if(nbSamples[b] > elmtsInClass[b])
+      {
+        nbSamples[b] = elmtsInClass[b]
+      }
+    
     }
     
     // *** *** 2nd run : SAMPLING   *** ***
@@ -442,25 +464,39 @@ private:
         for(; featIt!=filtered.end(); ++featIt)
         {                     
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
+          bool testPoly = false;
+          bool testLineBuffers = false;
+          if(geom->getGeometryType() == wkbLineString)
+          {
+            geom = geom->Buffer(3);
+            //std::cout<< "Coord : " << geom->getCoordinateDimension() << std::endl;
+            testLineBuffers = true;
+          }
           
-          //Class name recuperation
-          int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());             
-          
-          //We are dealing with simple polygons
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
+            testPoly = true;
+          }
+             
+          //Class name recuperation
+          int className = featIt->ogr().GetFieldAsInteger(GetParameterString("cfield").c_str());
+          
+          //We are dealing with simple polygons
+          if(testPoly || testLineBuffers)
+          {           
             OGRPolygon * inPolygon = dynamic_cast<OGRPolygon *>(geom);          
             OGRLinearRing * exteriorRing = inPolygon->getExteriorRing(); 
             
             IteratorType it(extractROIFilter->GetOutput(), extractROIFilter->GetOutput()->GetLargestPossibleRegion());
              
             //Compute the number of pixel we need to sample in each polygons
-            int nbPixelsInPolygon = static_cast<int>((nbSamples)*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));    
+            int nbPixelsInPolygon = static_cast<int>((nbSamples[className])*(polygon[featIt->ogr().GetFID()])/(elmtsInClass[className]));    
             
             //If this number is less then 1, we force it to be 1
             if(nbPixelsInPolygon < 1)
             {
               nbPixelsInPolygon = 1;
+              polyForced++;
             }
             
             //Compute of the period of sampling, every n-pixels we raise one
@@ -471,13 +507,7 @@ private:
             counterPixelsInPolygonShifted[featIt->ogr().GetFID()] = counterPixelsInPolygon[featIt->ogr().GetFID()] + periodOfSampling;
             //Position of the next pixel raised
             int nextPixelRaisedPosition = periodOfSampling;
-            
-            if(featIt->ogr().GetFID() == 539)
-            {
-              std::cout << "Nb de pix a sampler dans ce poly : " << nbPixelsInPolygon << std::endl;
-              std::cout << "RandomPosition : " << randomPositionInPolygon[featIt->ogr().GetFID()] << std::endl;
-            }
-                       
+                                               
             //Loop across pixels in the tile
             for (it.GoToBegin(); !it.IsAtEnd(); ++it)
             {   
@@ -520,7 +550,7 @@ private:
                 if (samplingMode == "random")
                 {
                   //The probability of sampling a pixel is function of the number of pixels in every classes
-                  float probability = static_cast<float>(nbSamples)/static_cast<float>(nbPixelsGlobal);
+                  float probability = static_cast<float>(nbSamples[className])/static_cast<float>(nbPixelsGlobal);
                   if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
@@ -531,7 +561,7 @@ private:
                 if (samplingMode == "randomequally")
                 {
                   //The probability of sampling a pixel is function of the number of pixels in each classes
-                  float probability = static_cast<float>(nbSamples)/static_cast<float>(elmtsInClass[className]);
+                  float probability = static_cast<float>(nbSamples[className])/static_cast<float>(elmtsInClass[className]);
                   if(generator->GetUniformVariate(0, 1) < probability)
                   {
                     resultTest= true;        
@@ -660,13 +690,14 @@ private:
     myfile.close();
     
     //End of progression bar
-    std::cout<<std::endl;    
-    
+    std::cout<<"100%"<<std::endl;    
+    //std::cout<<"polyForced" << polyForced<<std::endl;
     //Output the number of pixel sampled in each classes.
-    for(int b=1; b < elmtsInClass.size()+1; b++)
+    for(int b=1; b < 5; b++)
     {
       otbAppLogINFO(<< "Number of pixels raised in class " << b << " : "<< nbPixelsRaised[b]<< std::endl);
-    }    
+    } 
+    
   }
 };
 }
