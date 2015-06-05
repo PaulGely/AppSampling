@@ -7,6 +7,7 @@ otb_module(AppSampling
     OTBITK
     OTBImageBase
     OTBImageIO
+    OTBStatistics
 
   DESCRIPTION
     "${DOCUMENTATION}"

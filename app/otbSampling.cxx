@@ -399,7 +399,7 @@ private:
       nbSamples[b] = GetParameterInt("samples");
       if(nbSamples[b] > elmtsInClass[b])
       {
-        nbSamples[b] = elmtsInClass[b]
+        nbSamples[b] = elmtsInClass[b];
       }
     
     }

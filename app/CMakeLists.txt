@@ -3,7 +3,14 @@ OTB_CREATE_APPLICATION(NAME otbSampling
                        LINK_LIBRARIES ${${otb-module}_LIBRARIES}
 )
 
+OTB_CREATE_APPLICATION(NAME BandValues
+                       SOURCES bandValues.cxx
+                       LINK_LIBRARIES ${${otb-module}_LIBRARIES}    
+)
 
-
+OTB_CREATE_APPLICATION(NAME SamplingImageList
+                       SOURCES samplingImageList.cxx
+                       LINK_LIBRARIES ${${otb-module}_LIBRARIES}
+)
 
 
