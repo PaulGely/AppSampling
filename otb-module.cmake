@@ -8,7 +8,7 @@ otb_module(AppSampling
     OTBImageBase
     OTBImageIO
     OTBStatistics
-
+    OTBIOXML
   DESCRIPTION
     "${DOCUMENTATION}"
 )
