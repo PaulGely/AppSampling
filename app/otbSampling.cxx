@@ -95,7 +95,7 @@ private:
     MandatoryOff("samples"); 
     
     AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
-    SetDefaultParameterInt("tiles", 500);
+    SetDefaultParameterInt("tiles", 200);
     MandatoryOff("tiles");
     
     AddParameter(ParameterType_Int, "nd", "NoData value");
@@ -366,10 +366,10 @@ private:
     
     std::cout << "Nb nbPixelsGlobal " << nbPixelsGlobal << std::endl;
     
-    //for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
-    //{
-    //  std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
-    //}
+    for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
+    {
+      std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
+    }
     
     //std::cout<< "Nb de polygones : " << polygon.size() << std::endl;
 
@@ -379,31 +379,24 @@ private:
     //{
     //  std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
     //} 
-    
-        
+            
     otbAppLogINFO(<< "Sampling pixels with the sampling mode : " << samplingMode << std::endl);
     
     //Progression bar re-initialisation
     stepsProgression = 0;    
-    
-    
         
     //Initialisation counter of pixel raised in each classes
-    int nbPixelsRaised[elmtsInClass.size()+1];
-    int nbSamples[elmtsInClass.size()+1];
-    for(int b=0; b < elmtsInClass.size()+1; b++)
+    std::map<int, int> nbPixelsRaised;
+    std::map<int, int> nbSamples;
+    for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
     {
-      nbPixelsRaised[b]=0;
-      
-      //Number of samples we desire for each classes (globaly for the random mode)   
-      nbSamples[b] = GetParameterInt("samples");
-      if(nbSamples[b] > elmtsInClass[b])
+      nbSamples[(*iClass).first] = GetParameterInt("samples");
+      if(nbSamples[(*iClass).first] > (*iClass).second)
       {
-        nbSamples[b] = elmtsInClass[b];
+        nbSamples[(*iClass).first] = (*iClass).second;
       }
-    
+      
     }
-    
     // *** *** 2nd run : SAMPLING   *** ***
     //Loop across tiles
     for(unsigned int row = 0; row < nbTilesY; ++row)
@@ -453,22 +446,25 @@ private:
         ul.setX(ulPoint[0]);
         ul.setY(ulPoint[1]);
         lr.setX(lrPoint[0]);
-        lr.setY(lrPoint[1]); 
-
-        otb::ogr::Layer filtered = vectorData->GetLayer(0);
-        filtered.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
+        lr.setY(lrPoint[1]);
         
-        otb::ogr::Layer::const_iterator featIt = filtered.begin(); 
+        otb::ogr::DataSource::Pointer vectorData2 = otb::ogr::DataSource::New(GetParameterString("shp").c_str(), otb::ogr::DataSource::Modes::Read);
+        otb::ogr::Layer filtered2 = vectorData2->GetLayer(0);
+        filtered2.SetSpatialFilterRect(ul.getX(), ul.getY(), lr.getX(), lr.getY());
+        otb::ogr::Layer::const_iterator featIt = filtered2.begin(); 
+        
+        unsigned int c = 0;
         
         //Loop across the features in the layer
-        for(; featIt!=filtered.end(); ++featIt)
+        for(; featIt!=filtered2.end(); ++featIt,++c)
         {                     
           OGRGeometry * geom = featIt->ogr().GetGeometryRef();
           bool testPoly = false;
           bool testLineBuffers = false;
           if(geom->getGeometryType() == wkbLineString)
           {
-            geom = geom->Buffer(3);
+            // Il faut redéfinir geom
+            //geom = geom->Buffer(3);
             //std::cout<< "Coord : " << geom->getCoordinateDimension() << std::endl;
             testLineBuffers = true;
           }
@@ -476,6 +472,7 @@ private:
           if(geom->getGeometryType() == wkbPolygon25D || geom->getGeometryType() == wkbPolygon)
           {
             testPoly = true;
+            //std::cout<< "Coord : " << featIt->ogr().GetFID() << std::endl;
           }
              
           //Class name recuperation
@@ -693,10 +690,10 @@ private:
     std::cout<<"100%"<<std::endl;    
     //std::cout<<"polyForced" << polyForced<<std::endl;
     //Output the number of pixel sampled in each classes.
-    for(int b=1; b < 5; b++)
+    for(std::map<int, int>::iterator iClass = nbPixelsRaised.begin(); iClass != nbPixelsRaised.end(); ++iClass)
     {
-      otbAppLogINFO(<< "Number of pixels raised in class " << b << " : "<< nbPixelsRaised[b]<< std::endl);
-    } 
+      otbAppLogINFO(<< "Number of pixels raised in class " << (*iClass).first << " : "<< (*iClass).second<< std::endl);
+    }
     
   }
 };
