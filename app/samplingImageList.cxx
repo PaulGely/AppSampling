@@ -76,12 +76,13 @@ public:
 private:
   void DoInit()
   {
-    SetName("otbSampling");
+    SetName("SamplingImageList");
     SetDescription("This application sample pixels from an image and shape file with instruction from .xml file.");
     
     AddParameter(ParameterType_InputImage, "in", "Input Image List");    
     AddParameter(ParameterType_InputFilename, "xml", "XML Analysis File");
-    AddParameter(ParameterType_InputFilename, "shp", "Vectoriel File");    
+    AddParameter(ParameterType_InputFilename, "shp", "Vectoriel File"); 
+    AddParameter(ParameterType_OutputFilename, "v", "Verification Mask");
     AddParameter(ParameterType_OutputFilename, "out", "Output Text");    
     AddParameter(ParameterType_String, "cfield", "Field of class");
     
@@ -190,14 +191,14 @@ private:
     //Varibles to build the progression bar
     int stepsProgression = 0;
     int currentProgression;
-    
-    otbAppLogINFO(<< "Computing the number of pixels for each polygons and classes" << std::endl);
-    
+        
     //Initialisation of the random generator
     typedef itk::Statistics::MersenneTwisterRandomVariateGenerator GeneratorType;
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
     generator->SetSeed(seed);
+    
+    
     
     int polyForced = 0;
               
@@ -210,28 +211,45 @@ private:
     unsigned long sizeImageY = image->GetLargestPossibleRegion().GetSize()[1];    
     unsigned int nbTilesX    = sizeImageX/sizeTilesX + (sizeImageX%sizeTilesX > 0 ? 1 : 0);
     unsigned int nbTilesY    = sizeImageY/sizeTilesY + (sizeImageY%sizeTilesY > 0 ? 1 : 0);   
-      
+     
     //Progression bar re-initialisation
     stepsProgression = 0;    
       
     TiXmlDocument doc(GetParameterString("xml").c_str());
-     
-    TiXmlHandle hDoc(&doc);
-    TiXmlHandle root = hDoc.FirstChildElement("ClassGlobal");
-
-    for(TiXmlElement* currentStat = root.FirstChildElement().ToElement(); currentStat != NULL; currentStat = currentStat->NextSiblingElement())
+    if(!doc.LoadFile())
     {
-      //currentStat->Attribute("name");
-
-
-
-      
-      
-      
-      
-      
+      std::cout << "le DOC n'existe pas" << std::endl;
     }
-        
+    TiXmlElement *elem = doc.FirstChildElement()->FirstChildElement();
+    if(!elem)
+    {
+      std::cout << "le elem n'existe pas" << std::endl;
+    }
+
+    for(TiXmlElement* sample = elem->FirstChildElement("Class"); sample != NULL; sample = sample->NextSiblingElement())
+    {
+      // Get the current value of the statistic vector
+      int name, value;
+      sample->QueryIntAttribute("name", &name);
+      sample->QueryIntAttribute("value", &value);
+      elmtsInClass[name] = value;
+    }
+    for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
+    {
+      std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
+    }
+    elem = elem->NextSiblingElement();
+    
+    for(TiXmlElement* sample = elem->FirstChildElement("Id"); sample != NULL; sample = sample->NextSiblingElement())
+    {
+      // Get the current value of the statistic vector
+      double name, value;
+      sample->QueryDoubleAttribute("name", &name);
+      sample->QueryDoubleAttribute("value", &value);
+      polygon[name] = value;
+      randomPositionInPolygon[name] = static_cast<int>(generator->GetUniformVariate(0, polygon[name]));
+    }
+       
     //Initialisation counter of pixel raised in each classes
     std::map<int, int> nbPixelsRaised;
     std::map<int, int> nbSamples;
@@ -241,9 +259,14 @@ private:
       if(nbSamples[(*iClass).first] > (*iClass).second)
       {
         nbSamples[(*iClass).first] = (*iClass).second;
-      }
-      
+      }      
     }
+    
+    /*for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
+    {
+      std::cout << "Dans le polygon " << (*ipolygon).first << " il y a " << (*ipolygon).second << " pixels." << std::endl;
+    }*/
+      
     // *** *** 2nd run : SAMPLING   *** ***
     //Loop across tiles
     for(unsigned int row = 0; row < nbTilesY; ++row)
@@ -431,7 +454,7 @@ private:
                 if (samplingMode == "periodicrandom")
                 {
                   //In a polygon where we only need one pixel, we raise it at a radom position
-                  if((counterPixelsInPolygon[featIt->ogr().GetFID()] == randomPositionInPolygon[featIt->ogr().GetFID()]) && (nbPixelsInPolygon == 1))
+                  if((counterPixelsInPolygon[featIt->ogr().GetFID()] == randomPositionInPolygon[featIt->ogr().GetFID()])&&(nbPixelsInPolygon == 1))
                   {
                     resultTest= true;
                   } 
