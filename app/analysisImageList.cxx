@@ -81,7 +81,7 @@ private:
     AddParameter(ParameterType_InputImage, "in", "Input Image");    
     
     AddParameter(ParameterType_InputFilename, "shp", "Vectoriel File");    
-    AddParameter(ParameterType_OutputFilename, "out", "Output Text");       
+    AddParameter(ParameterType_OutputFilename, "out", "Output XML file");       
     AddParameter(ParameterType_String, "cfield", "Field of class");
         
     AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
