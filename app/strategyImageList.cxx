@@ -76,8 +76,7 @@ private:
   void DoExecute()
   { 
     std::map<int, int> elmtsInClassGlobal;
-    
-    
+        
     std::vector<std::string> xmlFilenameList = GetParameterStringList("xml");
     
     for (std::vector<std::string>::iterator f = xmlFilenameList.begin() ; f != xmlFilenameList.end(); ++f)
@@ -111,7 +110,7 @@ private:
     }
     
     TiXmlDocument docGlobal;
-    TiXmlDeclaration* decl = new TiXmlDeclaration( "1.0", "", "" );
+    TiXmlDeclaration* decl = new TiXmlDeclaration("1.0", "", "");
     docGlobal.LinkEndChild(decl);
       
     TiXmlElement * root = new TiXmlElement("ImageAnalysisGlobal");
@@ -126,8 +125,7 @@ private:
       root->LinkEndChild(featureClass);        
     }
     docGlobal.SaveFile(GetParameterString("out").c_str());
-  }
-    
+  }    
 };
 }
 }

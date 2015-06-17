@@ -129,8 +129,7 @@ private:
     unsigned long sizeImageY;    
     unsigned long nbTilesX;
     unsigned long nbTilesY;
-    
-    
+        
     //Number of pixels in all the polygons
     int nbPixelsGlobal = 0; 
     
@@ -145,14 +144,12 @@ private:
     std::map<unsigned long, int> counterPixelsInPolygonShifted;
     //RandomPosition of a sampled pixel for each polygons
     std::map<unsigned long, int> randomPositionInPolygon;
-
-    //Varibles to build the progression bar
-    
-    
+        
     otbAppLogINFO(<< "Computing the number of pixels for each polygons and classes" << std::endl);
     
     int polyForced = 0;
     
+    //Varibles to build the progression bar
     int stepsProgression = 0;
     int currentProgression;      
     
@@ -320,8 +317,7 @@ private:
       }     
     }
     std::cout<<std::endl;
-    
-    
+        
     //End of progression bar
     std::cout<<"100%"<<std::endl;
       
@@ -348,7 +344,7 @@ private:
     }*/   
       
     TiXmlDocument doc;
-    TiXmlDeclaration* decl = new TiXmlDeclaration( "1.0", "", "" );
+    TiXmlDeclaration* decl = new TiXmlDeclaration("1.0", "", "");
     doc.LinkEndChild(decl);
       
     TiXmlElement * root = new TiXmlElement("ImageAnalysis");
