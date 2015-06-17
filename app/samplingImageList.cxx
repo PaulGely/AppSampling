@@ -81,6 +81,7 @@ private:
     
     AddParameter(ParameterType_InputImage, "in", "Input Image List");    
     AddParameter(ParameterType_InputFilename, "xml", "XML Analysis File");
+    AddParameter(ParameterType_InputFilename, "xmlGlobal", "XML Global Analysis File");
     AddParameter(ParameterType_InputFilename, "shp", "Vectoriel File"); 
     AddParameter(ParameterType_OutputFilename, "v", "Verification Mask");
     AddParameter(ParameterType_OutputFilename, "out", "Output Text");    
@@ -93,6 +94,10 @@ private:
     AddChoice("mode.periodic", "Periodic sampling, in all the polygons");
     AddChoice("mode.periodicrandom", "Periodic sampling, in all the polygons, randomly shifted");
         
+    AddParameter(ParameterType_Choice, "strategy", "Strategy of sampling");
+    AddChoice("strategy.equally", "Equal repartion across the images");
+    AddChoice("strategy.proportional", "Proportional repartion across the images");
+    
     AddParameter(ParameterType_Int, "samples", "Number of samples per classes");
     SetDefaultParameterInt("samples", 2000);
     MandatoryOff("samples"); 
@@ -149,6 +154,9 @@ private:
     
     //Mode recuperation from the parameter
     const std::string samplingMode = GetParameterString("mode");
+        
+    //Strategy recuperation from the parameter
+    const std::string samplingStrategy = GetParameterString("strategy");
     
     //Number of elements in each pixels
     unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
@@ -178,7 +186,7 @@ private:
     
     //Number of pixels in each classes
     std::map<int, int> elmtsInClass;
-    
+    std::map<int, int> elmtsInClassGlobal;
     //Number of pixels in each polygons
     std::map<unsigned long, int> polygon;
     //Counter of pixels in the current polygon
@@ -197,9 +205,7 @@ private:
     GeneratorType::Pointer generator = GeneratorType::New();
     generator->Initialize();
     generator->SetSeed(seed);
-    
-    
-    
+        
     int polyForced = 0;
               
     otbAppLogINFO(<< "Sampling pixels with the sampling mode : " << samplingMode << std::endl);
@@ -249,17 +255,51 @@ private:
       polygon[name] = value;
       randomPositionInPolygon[name] = static_cast<int>(generator->GetUniformVariate(0, polygon[name]));
     }
+    
+    TiXmlDocument docGlobal(GetParameterString("xmlGlobal").c_str());
+    if(!docGlobal.LoadFile())
+    {
+      std::cout << "le DOC Global n'existe pas" << std::endl;
+    }
+    TiXmlElement *elemGlobal = docGlobal.FirstChildElement()->FirstChildElement();
+    if(!elemGlobal)
+    {
+      std::cout << "le elem Global n'existe pas" << std::endl;
+    }
+
+    for(TiXmlElement* sample = elemGlobal->FirstChildElement("Class"); sample != NULL; sample = sample->NextSiblingElement())
+    {
+      // Get the current value of the statistic vector
+      int name, value;
+      sample->QueryIntAttribute("name", &name);
+      sample->QueryIntAttribute("value", &value);
+      elmtsInClassGlobal[name] = value;
+    }
        
     //Initialisation counter of pixel raised in each classes
     std::map<int, int> nbPixelsRaised;
     std::map<int, int> nbSamples;
     for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
     {
-      nbSamples[(*iClass).first] = GetParameterInt("samples");
-      if(nbSamples[(*iClass).first] > (*iClass).second)
+      if (samplingStrategy == "equally")
       {
-        nbSamples[(*iClass).first] = (*iClass).second;
-      }      
+        nbSamples[(*iClass).first] = GetParameterInt("samples");
+        if(nbSamples[(*iClass).first] > (*iClass).second)
+        {
+          nbSamples[(*iClass).first] = (*iClass).second;
+        }
+      }
+      
+      if (samplingStrategy == "proportional")
+      {
+        nbSamples[(*iClass).first] = nbSamples[(*iClass).first] * ((*iClass).second/elmtsInClassGlobal[(*iClass).first]);
+        
+        if(nbSamples[(*iClass).first] > (*iClass).second)
+        {
+          nbSamples[(*iClass).first] = (*iClass).second;
+        }
+      }
+            
     }
     
     /*for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
@@ -564,8 +604,7 @@ private:
     for(std::map<int, int>::iterator iClass = nbPixelsRaised.begin(); iClass != nbPixelsRaised.end(); ++iClass)
     {
       otbAppLogINFO(<< "Number of pixels raised in class " << (*iClass).first << " : "<< (*iClass).second<< std::endl);
-    }
-    
+    }    
   }
 };
 }
