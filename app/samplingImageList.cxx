@@ -81,11 +81,12 @@ private:
     
     AddParameter(ParameterType_InputImage, "in", "Input Image List");    
     AddParameter(ParameterType_InputFilename, "xml", "XML Analysis File");
-    AddParameter(ParameterType_InputFilename, "xmlGlobal", "XML Global Analysis File");
+    AddParameter(ParameterType_InputFilename, "xmlglobal", "XML Global Analysis File");
     AddParameter(ParameterType_InputFilename, "shp", "Vectoriel File"); 
     AddParameter(ParameterType_OutputFilename, "v", "Verification Mask");
     AddParameter(ParameterType_OutputFilename, "out", "Output Text");    
     AddParameter(ParameterType_String, "cfield", "Field of class");
+    AddParameter(ParameterType_Int, "imagenum", "Image Number");
     
     AddParameter(ParameterType_Choice, "mode", "Mode of sampling");
     AddChoice("mode.exhaustive", "Exhaustive Sampling");
@@ -94,14 +95,6 @@ private:
     AddChoice("mode.periodic", "Periodic sampling, in all the polygons");
     AddChoice("mode.periodicrandom", "Periodic sampling, in all the polygons, randomly shifted");
         
-    AddParameter(ParameterType_Choice, "strategy", "Strategy of sampling");
-    AddChoice("strategy.equally", "Equal repartion across the images");
-    AddChoice("strategy.proportional", "Proportional repartion across the images");
-    
-    AddParameter(ParameterType_Int, "samples", "Number of samples per classes");
-    SetDefaultParameterInt("samples", 2000);
-    MandatoryOff("samples"); 
-    
     AddParameter(ParameterType_Int, "tiles", "Size of square tiles");
     SetDefaultParameterInt("tiles", 200);
     MandatoryOff("tiles");
@@ -154,10 +147,7 @@ private:
     
     //Mode recuperation from the parameter
     const std::string samplingMode = GetParameterString("mode");
-        
-    //Strategy recuperation from the parameter
-    const std::string samplingStrategy = GetParameterString("strategy");
-    
+          
     //Number of elements in each pixels
     unsigned int nbComponents = image->GetNumberOfComponentsPerPixel();
     
@@ -255,51 +245,51 @@ private:
       polygon[name] = value;
       randomPositionInPolygon[name] = static_cast<int>(generator->GetUniformVariate(0, polygon[name]));
     }
-    
-    TiXmlDocument docGlobal(GetParameterString("xmlGlobal").c_str());
-    if(!docGlobal.LoadFile())
-    {
-      std::cout << "le DOC Global n'existe pas" << std::endl;
-    }
-    TiXmlElement *elemGlobal = docGlobal.FirstChildElement()->FirstChildElement();
-    if(!elemGlobal)
-    {
-      std::cout << "le elem Global n'existe pas" << std::endl;
-    }
-
-    for(TiXmlElement* sample = elemGlobal->FirstChildElement("Class"); sample != NULL; sample = sample->NextSiblingElement())
-    {
-      // Get the current value of the statistic vector
-      int name, value;
-      sample->QueryIntAttribute("name", &name);
-      sample->QueryIntAttribute("value", &value);
-      elmtsInClassGlobal[name] = value;
-    }
-       
+                   
     //Initialisation counter of pixel raised in each classes
     std::map<int, int> nbPixelsRaised;
     std::map<int, int> nbSamples;
-    for(std::map<int, int>::iterator iClass = elmtsInClass.begin(); iClass != elmtsInClass.end(); ++iClass)
+    
+    TiXmlDocument docGlobal(GetParameterString("xmlglobal").c_str());
+    if(!docGlobal.LoadFile())
     {
-      if (samplingStrategy == "equally")
+      std::cout << "le DOC n'existe pas" << std::endl;
+    }
+    
+    TiXmlElement *elemGlobal = docGlobal.FirstChildElement();
+    if(!elemGlobal)
+    {
+      std::cout << "le elemGlobal n'existe pas" << std::endl;
+    }
+    for(TiXmlElement* image = elemGlobal->FirstChildElement("Image"); image != NULL; image = image->NextSiblingElement())
+    {      
+      if(!image)
       {
-        nbSamples[(*iClass).first] = GetParameterInt("samples");
-        if(nbSamples[(*iClass).first] > (*iClass).second)
-        {
-          nbSamples[(*iClass).first] = (*iClass).second;
-        }
+        std::cout << "le image n'existe pas" << std::endl;
       }
-      
-      if (samplingStrategy == "proportional")
+      int nameImg;
+      image->QueryIntAttribute("name", &nameImg);
+      if(nameImg == GetParameterInt("imagenum"))
       {
-        nbSamples[(*iClass).first] = nbSamples[(*iClass).first] * ((*iClass).second/elmtsInClassGlobal[(*iClass).first]);
         
-        if(nbSamples[(*iClass).first] > (*iClass).second)
+        for(TiXmlElement* sample = image->FirstChildElement("Class"); sample != NULL; sample = sample->NextSiblingElement())
         {
-          nbSamples[(*iClass).first] = (*iClass).second;
+          if(!sample)
+          {
+            std::cout << "le sample n'existe pas" << std::endl;
+          }
+          // Get the current value of the statistic vector
+          int name, value;
+          sample->QueryIntAttribute("name", &name);
+          sample->QueryIntAttribute("value", &value);
+          nbSamples[name] = value;
         }
-      }
-            
+      }      
+    }
+    
+    for(std::map<int, int>::iterator iClass = nbSamples.begin(); iClass != nbSamples.end(); ++iClass)
+    {
+      std::cout << "Dans la classe " << (*iClass).first << " il faut ::  " << (*iClass).second << " pixels." << std::endl;
     }
     
     /*for(std::map<unsigned long, int>::iterator ipolygon = polygon.begin(); ipolygon != polygon.end(); ++ipolygon)
