@@ -67,6 +67,11 @@ private:
     
     AddParameter(ParameterType_InputFilenameList, "xml", "XML Analysis File");
     AddParameter(ParameterType_OutputFilename, "out", "Output XML file");
+    AddParameter(ParameterType_Int, "samples", "Number of samples per classes");
+    
+    AddParameter(ParameterType_Choice, "strategy", "Strategy of sampling");
+    AddChoice("strategy.equally", "Equal repartion across the images");
+    AddChoice("strategy.proportional", "Proportional repartion across the images");
   }
 
   void DoUpdateParameters()
@@ -75,8 +80,14 @@ private:
 
   void DoExecute()
   { 
+    std::map<int, std::map<int, int> > nbSamples;
+    std::map<int, std::map<int, int> > elmtsInClass;
     std::map<int, int> elmtsInClassGlobal;
-        
+    int imageCount = 0;
+    
+    //Strategy recuperation from the parameter
+    const std::string samplingStrategy = GetParameterString("strategy");
+    
     std::vector<std::string> xmlFilenameList = GetParameterStringList("xml");
     
     for (std::vector<std::string>::iterator f = xmlFilenameList.begin() ; f != xmlFilenameList.end(); ++f)
@@ -101,30 +112,62 @@ private:
         sample->QueryIntAttribute("name", &name);
         sample->QueryIntAttribute("value", &value);
         elmtsInClassGlobal[name] += value;
-      }      
+        elmtsInClass[imageCount][name] = value;
+      }   
+      
+      imageCount++;
     }
-    
-    for(std::map<int, int>::iterator iClass = elmtsInClassGlobal.begin(); iClass != elmtsInClassGlobal.end(); ++iClass)
+        
+    for(std::map<int, std::map<int, int> >::iterator iImage = elmtsInClass.begin(); iImage != elmtsInClass.end(); ++iImage)
     {
-      std::cout << "Dans la classe " << (*iClass).first << " il y a " << (*iClass).second << " pixels." << std::endl;
-    }
+      for(std::map<int, int>::iterator iClass = (*iImage).second.begin(); iClass != (*iImage).second.end(); ++iClass)
+      {
+        if (samplingStrategy == "equally")
+        {
+          nbSamples[(*iImage).first][(*iClass).first] = GetParameterInt("samples");
+          if(nbSamples[(*iImage).first][(*iClass).first] > (*iClass).second)
+          {
+            nbSamples[(*iImage).first][(*iClass).first] = (*iClass).second;
+          }
+        }
+        
+        else if (samplingStrategy == "proportional")
+        {
+          
+          std::cout << "coef " << static_cast<float>((*iClass).second) / static_cast<float>(elmtsInClassGlobal[(*iClass).first]) << std::endl;
+          nbSamples[(*iImage).first][(*iClass).first] = GetParameterInt("samples") * static_cast<float>((*iClass).second) / static_cast<float>(elmtsInClassGlobal[(*iClass).first]);
+          
+          if(nbSamples[(*iImage).first][(*iClass).first] > (*iClass).second)
+          {
+            nbSamples[(*iImage).first][(*iClass).first] = (*iClass).second;
+          }
+        } 
+      }        
+    }   
     
     TiXmlDocument docGlobal;
     TiXmlDeclaration* decl = new TiXmlDeclaration("1.0", "", "");
     docGlobal.LinkEndChild(decl);
       
-    TiXmlElement * root = new TiXmlElement("ImageAnalysisGlobal");
-    docGlobal.LinkEndChild(root);
-      
-    for(std::map<int, int>::iterator iClass = elmtsInClassGlobal.begin(); iClass != elmtsInClassGlobal.end(); ++iClass)
+    TiXmlElement * root = new TiXmlElement("StrategyGlobal");
+    docGlobal.LinkEndChild(root);     
+    
+    for(std::map<int, std::map<int, int> >::iterator iImage = nbSamples.begin(); iImage != nbSamples.end(); ++iImage)
     {
-            
-      TiXmlElement * featureClass = new TiXmlElement("Class");
-      featureClass->SetDoubleAttribute("name", (*iClass).first);
-      featureClass->SetAttribute("value", (*iClass).second);
-      root->LinkEndChild(featureClass);        
+      TiXmlElement * featureImage = new TiXmlElement("Image");
+      featureImage->SetDoubleAttribute("name", (*iImage).first);
+      root->LinkEndChild(featureImage); 
+      for(std::map<int, int>::iterator iClass = (*iImage).second.begin(); iClass != (*iImage).second.end(); ++iClass)
+      {
+        TiXmlElement * featureClass = new TiXmlElement("Class");
+        featureClass->SetDoubleAttribute("name", (*iClass).first);
+        featureClass->SetAttribute("value", (*iClass).second);
+        featureImage->LinkEndChild(featureClass);
+      }            
     }
+    
     docGlobal.SaveFile(GetParameterString("out").c_str());
+         
   }    
 };
 }
