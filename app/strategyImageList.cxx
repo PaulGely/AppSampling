@@ -94,7 +94,7 @@ private:
     {
       std::cout << *f << std::endl;
       
-      TiXmlDocument doc(*f);
+      TiXmlDocument doc(f->c_str());
       if(!doc.LoadFile())
       {
         std::cout << "le DOC n'existe pas" << std::endl;
