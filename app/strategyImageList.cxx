@@ -155,7 +155,7 @@ private:
     for(std::map<int, std::map<int, int> >::iterator iImage = nbSamples.begin(); iImage != nbSamples.end(); ++iImage)
     {
       TiXmlElement * featureImage = new TiXmlElement("Image");
-      featureImage->SetDoubleAttribute("name", (*iImage).first);
+      featureImage->SetDoubleAttribute("name", (*iImage).first+1);
       root->LinkEndChild(featureImage); 
       for(std::map<int, int>::iterator iClass = (*iImage).second.begin(); iClass != (*iImage).second.end(); ++iClass)
       {
