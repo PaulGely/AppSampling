@@ -1,0 +1,1 @@
+otbcli_otbSampling -in ~/OTB-Trunk/Test/SPOT6_France_2014-niveau_3GSIGN-S6X_2014090437622664CP.tif -shp ~/OTB-Trunk/Test/samples.shp -out ~/OTB-Trunk/Test/output.txt -v ~/OTB-Trunk/Test/verification.shp -cfield class -mode periodic -rand 1992 -samples 2000

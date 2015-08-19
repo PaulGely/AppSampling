@@ -653,7 +653,7 @@ private:
                   //Completing the text and shape output files with the pixel values
                   for (unsigned int i=0; i<nbComponents; i++)
                   {
-                    message += " " + to_string(i+1) + ": " + to_string(pixelValue[i]);  
+                    message += " " + to_string(i+1) + ":" + to_string(pixelValue[i]);  
                     featureOutput.ogr().SetField(i, pixelValue[i]);    
                   }
                   

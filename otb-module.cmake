@@ -9,6 +9,8 @@ otb_module(AppSampling
     OTBImageIO
     OTBStatistics
     OTBIOXML
+    OTBCommon
+    OTBAppClassification
   DESCRIPTION
     "${DOCUMENTATION}"
 )
