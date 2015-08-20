@@ -39,6 +39,7 @@
 #include "otbRandomForestsMachineLearningModel.h"
 #include "itkVariableLengthVector.h"
 #include "otbListSampleGenerator.h"
+#include <boost/algorithm/string.hpp>
 
 namespace otb
 {
@@ -60,12 +61,9 @@ public:
   typedef TrainRF Self;
   typedef itk::SmartPointer<Self> Pointer; 
   
-  typedef FloatVectorImageType::PixelType         PixelType;
-  typedef FloatVectorImageType::InternalPixelType InternalPixelType;
-
   typedef otb::ListSampleGenerator<FloatVectorImageType, VectorDataType> ListSampleGeneratorType;
   
-  typedef otb::RandomForestsMachineLearningModel<InternalPixelType, ListSampleGeneratorType::ClassLabelType> RandomForestType;
+  typedef otb::RandomForestsMachineLearningModel<float, int> RandomForestType;
 
   typedef otb::MachineLearningModel<float,short>         MachineLearningModelType;  
   typedef MachineLearningModelType::InputSampleType      InputSampleType;
@@ -85,8 +83,7 @@ private:
     SetName("TrainRF");
     SetDescription("Train RF. ");
     
-    AddParameter(ParameterType_OutputFilename, "in", "Input Image");
-    
+    AddParameter(ParameterType_OutputFilename, "in", "Input Image");    
     AddParameter(ParameterType_OutputFilename, "out", "Output model"); 
   }
 
@@ -95,13 +92,9 @@ private:
   }
 
   void DoExecute()
-  {
-    
-    
+  {   
     InputListSampleType::Pointer samples = InputListSampleType::New();
-    LabelListSampleType::Pointer labels = LabelListSampleType::New();
-    
-    
+    LabelListSampleType::Pointer labels = LabelListSampleType::New();   
     
     std::ifstream ifs;
     ifs.open(GetParameterString("in").c_str());
@@ -110,24 +103,21 @@ private:
     {
       std::cout<<"Could not read file "<<GetParameterString("in")<<std::endl;
     }
-    
-    
-    
+        
     unsigned int nbfeatures = 0;
 
     while (!ifs.eof())
     {
       std::string line;
       std::getline(ifs, line);
+      boost::algorithm::trim(line);
         
       if(nbfeatures == 0)
       {
-        nbfeatures = std::count(line.begin(),line.end(),' ') - 1;
+        nbfeatures = std::count(line.begin(),line.end(),' ');
         std::cout<<"Line "<<line<<std::endl;
         std::cout<<"Found "<<nbfeatures<<" features per samples"<<std::endl;
-      }
-
-      
+      }      
       
       if(line.size()>1)
       {
@@ -142,29 +132,27 @@ private:
 
         bool endOfLine = false;
         unsigned int id = 0;
-
         
         while(!endOfLine)
         {
           std::string::size_type nextpos = line.find_first_of(" ", pos+1);
 
-          if(nextpos == std::string::npos)
+          if(pos == std::string::npos)
           {
             endOfLine = true;
             nextpos = line.size()-1;
           }
           
           else
-          {
-            
+          {          
             std::string feature = line.substr(pos,nextpos-pos);
             std::string::size_type semicolonpos = feature.find_first_of(":");
             id = atoi(feature.substr(0,semicolonpos).c_str());
             sample[id - 1] = atof(feature.substr(semicolonpos+1,feature.size()-semicolonpos).c_str());
              
             pos = nextpos;
-            //std::cout << "id: " << id <<std::endl;
-            
+            std::cout << "id: " << id <<std::endl;
+            std::cout << "sample: " << sample <<std::endl;
           }           
 
         }      
@@ -178,8 +166,6 @@ private:
     std::cout<<"Retrieved "<<samples->Size()<<" samples"<<std::endl;
     ifs.close();
     
-    
-
     RandomForestType::Pointer classifier = RandomForestType::New();
     classifier->SetInputListSample(samples);
     classifier->SetTargetListSample(labels);
@@ -192,9 +178,8 @@ private:
     classifier->SetForestAccuracy(0.01);
 
     classifier->Train();
-    classifier->Save(GetParameterString("out"));
-    
-    
+    classifier->Save(GetParameterString("out")); 
+        
   }
 };
 }
