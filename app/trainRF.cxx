@@ -110,12 +110,12 @@ private:
     {
       std::string line;
       std::getline(ifs, line);
-      boost::algorithm::trim(line);
+      boost::algorithm::trim(line);  
         
       if(nbfeatures == 0)
       {
         nbfeatures = std::count(line.begin(),line.end(),' ');
-        std::cout<<"Line "<<line<<std::endl;
+        //std::cout<<"Line "<<line<<std::endl;
         std::cout<<"Found "<<nbfeatures<<" features per samples"<<std::endl;
       }      
       
@@ -151,10 +151,9 @@ private:
             sample[id - 1] = atof(feature.substr(semicolonpos+1,feature.size()-semicolonpos).c_str());
              
             pos = nextpos;
-            std::cout << "id: " << id <<std::endl;
-            std::cout << "sample: " << sample <<std::endl;
-          }           
-
+            //std::cout << "id: " << id <<std::endl;
+            //std::cout << "sample: " << sample <<std::endl;
+          }    
         }      
         
         samples->SetMeasurementVectorSize(itk::NumericTraits<InputSampleType>::GetLength(sample));
@@ -186,7 +185,4 @@ private:
 }
 
 OTB_APPLICATION_EXPORT(otb::Wrapper::TrainRF)
-
-
-
 
