@@ -81,7 +81,7 @@ private:
   void DoInit()
   {
     SetName("TrainRF");
-    SetDescription("Train RF. ");
+    SetDescription("Train Random Forest. ");
     
     AddParameter(ParameterType_OutputFilename, "in", "Input Image");    
     AddParameter(ParameterType_OutputFilename, "out", "Output model"); 
