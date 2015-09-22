@@ -169,11 +169,11 @@ private:
     classifier->SetInputListSample(samples);
     classifier->SetTargetListSample(labels);
     classifier->SetMaxDepth(5);
-    classifier->SetMinSampleCount(10);
+    classifier->SetMinSampleCount(50);
     classifier->SetRegressionAccuracy(0.);
     classifier->SetMaxNumberOfCategories(10);
-    classifier->SetMaxNumberOfVariables(0);
-    classifier->SetMaxNumberOfTrees(100);
+    classifier->SetMaxNumberOfVariables(6);
+    classifier->SetMaxNumberOfTrees(250);
     classifier->SetForestAccuracy(0.01);
 
     classifier->Train();
